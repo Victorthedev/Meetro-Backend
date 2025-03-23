@@ -1,11 +1,11 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const Event = require('../../models/Event');
+const Event = require('../models/Event');
 
 class ConnectNigeriaScraper {
   async scrape() {
     try {
-      const response = await axios.get('https://connectnigeria.com/events/');
+      const response = await axios.get('https://events.connectnigeria.com/');
       const $ = cheerio.load(response.data);
       
       const events = [];

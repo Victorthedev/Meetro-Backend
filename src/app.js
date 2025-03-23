@@ -9,6 +9,7 @@ const { connectRedis } = require('./config/redis');
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const shareRoutes = require('./routes/shareRoutes');
+require('./services/ScraperService');
 
 const app = express();
 
@@ -28,8 +29,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-const ScraperService = require('./services/ScraperService');
-new ScraperService(); // This starts the automatic scraping
+// const ScraperService = require('./services/ScraperService');
+// new ScraperService();
 
 // Routes
 app.use('/api/auth', authRoutes);

@@ -1,23 +1,24 @@
-const EventbriteScraper = require('./scrapers/eventbrite');
-const AllEventsScraper = require('./scrapers/allEvents');
-const ConnectNigeriaScraper = require('./scrapers/connectNigeria');
-const EventsNigeriaScraper = require('./scrapers/eventsNigeria');
-const ShowsScraper = require('./scrapers/shows');
-const TicketmasterScraper = require('./scrapers/ticketmaster');
-const FacebookScraper = require('./scrapers/facebook');
+const EventbriteScraper = require('./eventbrite');
+const AllEventsScraper = require('./allEvents');
+const ConnectNigeriaScraper = require('./connectNigeria');
+const EventsNigeriaScraper = require('./eventsNigeria');
+const ShowsScraper = require('./shows');
+const TicketmasterScraper = require('./ticketmaster');
+const FacebookScraper = require('./facebook');
 const Event = require('../models/Event');
 const { scraperQueue } = require('../config/bull');
 
 class ScraperService {
   constructor() {
+    console.log('ScraperService initialized');
     this.scrapers = [
       EventbriteScraper,
       AllEventsScraper,
       ConnectNigeriaScraper,
       EventsNigeriaScraper,
       ShowsScraper,
-      TicketmasterScraper,
-      FacebookScraper
+      // TicketmasterScraper,
+      // FacebookScraper
     ];
     
     this.initializeScrapers();

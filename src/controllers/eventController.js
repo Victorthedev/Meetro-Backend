@@ -1,79 +1,84 @@
-const { OAuth2Client } = require('google-auth-library');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const Event = require('../models/Event');
+const { scraperQueue } = require('../config/bull');
+const CalendarService = require('../services/CalenderService');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-class AuthController {
-  async googleLogin(req, res) {
+class EventController {
+  async getEvents(req, res) {
     try {
-      const { token, state, calendarType } = req.body;
+      const { state, page = 1, limit = 10 } = req.query;
       
-      const ticket = await googleClient.verifyIdToken({
-        idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID
-      });
+      const query = state ? { 'location.state': state } : {};
       
-      const { email, name, picture, sub: googleId } = ticket.getPayload();
+      const events = await Event.find(query)
+        .sort({ startDate: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
 
-      let user = await User.findOne({ email });
-      
-      if (!user) {
-        user = await User.create({
-          email,
-          name,
-          googleId,
-          profilePicture: picture,
-          state,
-          calendarType
-        });
-      }
-
-      const jwtToken = jwt.sign(
-        { id: user._id },
-        process.env.JWT_SECRET,
-        { expiresIn: '30d' }
-      );
+      const total = await Event.countDocuments(query);
 
       res.json({
-        token: jwtToken,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          state: user.state,
-          profilePicture: user.profilePicture
-        }
+        events,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        total
       });
     } catch (error) {
-      res.status(400).json({ error: 'Invalid token' });
+      res.status(400).json({ error: 'Failed to fetch events' });
     }
   }
 
-  async getMe(req, res) {
+  async getEvent(req, res) {
     try {
-      const user = await User.findById(req.user._id);
-      res.json(user);
-    } catch (error) {
-      res.status(400).json({ error: 'User not found' });
-    }
-  }
-
-  async updateProfile(req, res) {
-    try {
-      const { state, calendarType } = req.body;
+      const event = await Event.findById(req.params.id);
       
-      const user = await User.findByIdAndUpdate(
-        req.user._id,
-        { state, calendarType },
-        { new: true }
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
+      res.json(event);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to fetch event' });
+    }
+  }
+
+  async addToCalendar(req, res) {
+    try {
+      const event = await Event.findById(req.params.id);
+      
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
+      if (req.user.calendarType === 'google') {
+        await CalendarService.addToGoogleCalendar(req.user, event);
+      } else {
+        await CalendarService.addToAppleCalendar(req.user, event);
+      }
+
+      await Event.findByIdAndUpdate(
+        event._id,
+        { $addToSet: { attendees: req.user._id } }
       );
 
-      res.json(user);
+      res.json({ message: 'Event added to calendar' });
     } catch (error) {
-      res.status(400).json({ error: 'Failed to update profile' });
+      res.status(400).json({ error: 'Failed to add event to calendar' });
+    }
+  }
+
+  async triggerScraping(req, res) {
+    try {
+      await scraperQueue.add('scrapeEvents', {}, {
+        repeat: {
+          cron: '0 0 * * *' // Run daily at midnight
+        }
+      });
+
+      res.json({ message: 'Scraping triggered' });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to trigger scraping' });
     }
   }
 }
 
-module.exports = new AuthController();
+module.exports = new EventController();

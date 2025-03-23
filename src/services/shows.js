@@ -1,6 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const Event = require('../../models/Event');
+const Event = require('../models/Event');
 
 class ShowsScraper {
   async scrape() {
