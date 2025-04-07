@@ -18,6 +18,7 @@ class AllEventsScraper {
           imageUrl: event.querySelector('img')?.src
         }));
       });
+      console.log('Scraped events:', events);
 
       await Promise.all(events.map(this.saveEvent));
     } finally {

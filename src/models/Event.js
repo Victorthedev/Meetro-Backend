@@ -10,6 +10,21 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  creator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  visibility: {
+    type: String,
+    enum: ['public', 'private'],
+    required: true
+  },
+  eventType: {
+    type: String,
+    enum: ['single', 'recurring'],
+    required: true
+  },
   startDate: {
     type: Date,
     required: true
@@ -19,62 +34,62 @@ const eventSchema = new mongoose.Schema({
     required: true
   },
   location: {
-    address: String,
-    city: String,
-    state: {
+    type: {
       type: String,
+      enum: ['offline', 'online'],
       required: true
     },
-    coordinates: {
-      type: {
-        type: String,
-        enum: ['Point'],
-        default: 'Point'
-      },
-      coordinates: [Number]
-    }
-  },
-  organizer: {
-    name: String,
-    contact: String
+    state: String,
+    address: String,
+    onlinePlatform: {
+      type: String,
+      enum: ['google_meet', 'zoom', 'teams', 'zoho']
+    },
+    meetingLink: String
   },
   category: {
     type: String,
+    enum: [
+      'Nightlife & Parties',
+      'Music & Concerts',
+      'Networking & Conferences',
+      'Festivals & Cultural Events',
+      'Sports & Fitness',
+      'Food & Drink Events',
+      'Tech & Innovation',
+      'Community Meetups',
+      'Art & Exhibitions',
+      'Outdoor & Adventure',
+      'Gaming & Esports',
+      'Charity & Fundraisers'
+    ],
     required: true
+  },
+  posterImage: {
+    type: String,
+    required: true
+  },
+  createdOnPlatform: {
+    type: Boolean,
+    default: true
   },
   source: {
     type: String,
-    required: true
+    default: 'meetro'
   },
-  sourceId: {
-    type: String,
-    required: true
-  },
-  imageUrl: String,
-  price: {
-    amount: Number,
-    currency: {
-      type: String,
-      default: 'NGN'
-    }
-  },
-  attendees: [{
+  coHosts: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  socialMediaLinks: {
+    facebook: String,
+    instagram: String,
+    twitter: String,
+    linkedin: String
   }
+}, {
+  timestamps: true
 });
 
-eventSchema.index({ 'location.coordinates': '2dsphere' });
-eventSchema.index({ sourceId: 1, source: 1 }, { unique: true });
-
 const Event = mongoose.model('Event', eventSchema);
-
 module.exports = Event;

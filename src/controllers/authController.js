@@ -8,25 +8,33 @@ class AuthController {
   async googleLogin(req, res) {
     try {
       const { token, state, calendarType } = req.body;
-      
+
       const ticket = await googleClient.verifyIdToken({
-        idToken: token,
+        idToken: req.body.id_token || token, 
         audience: process.env.GOOGLE_CLIENT_ID
       });
       
-      const { email, name, picture, sub: googleId } = ticket.getPayload();
+      const payload = ticket.getPayload();
+      const { email, name, picture, sub: googleId } = payload;
 
       let user = await User.findOne({ email });
       
       if (!user) {
         user = await User.create({
           email,
-          name,
+          name: name || email.split('@')[0], 
           googleId,
           profilePicture: picture,
           state,
           calendarType
         });
+      } else {
+
+        if (state || calendarType) {
+          user.state = state || user.state;
+          user.calendarType = calendarType || user.calendarType;
+          await user.save();
+        }
       }
 
       const jwtToken = jwt.sign(
@@ -42,11 +50,66 @@ class AuthController {
           name: user.name,
           email: user.email,
           state: user.state,
-          profilePicture: user.profilePicture
+          profilePicture: user.profilePicture,
+          calendarType: user.calendarType
         }
       });
     } catch (error) {
-      res.status(400).json({ error: 'Invalid token' });
+      console.error('Google Auth Error:', error);
+      res.status(400).json({ error: 'Invalid token', details: error.message });
+    }
+  }  async googleLogin(req, res) {
+    try {
+      const { token, state, calendarType } = req.body;
+      
+      const ticket = await googleClient.verifyIdToken({
+        idToken: req.body.id_token || token,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      
+      const payload = ticket.getPayload();
+      const { email, name, picture, sub: googleId } = payload;
+
+      let user = await User.findOne({ email });
+      
+      if (!user) {
+        user = await User.create({
+          email,
+          name: name || email.split('@')[0],
+          googleId,
+          profilePicture: picture,
+          state,
+          calendarType
+        });
+      } else {
+
+        if (state || calendarType) {
+          user.state = state || user.state;
+          user.calendarType = calendarType || user.calendarType;
+          await user.save();
+        }
+      }
+
+      const jwtToken = jwt.sign(
+        { id: user._id },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+
+      res.json({
+        token: jwtToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          state: user.state,
+          profilePicture: user.profilePicture,
+          calendarType: user.calendarType
+        }
+      });
+    } catch (error) {
+      console.error('Google Auth Error:', error);
+      res.status(400).json({ error: 'Invalid token', details: error.message });
     }
   }
 

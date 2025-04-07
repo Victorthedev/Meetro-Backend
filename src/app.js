@@ -9,13 +9,14 @@ const { connectRedis } = require('./config/redis');
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const shareRoutes = require('./routes/shareRoutes');
-require('./services/ScraperService');
+
 
 const app = express();
 
 // Connect to databases
 connectDB();
 connectRedis();
+require('./services/ScraperService');
 
 // Middleware
 app.use(helmet());

@@ -22,7 +22,14 @@ class ScraperService {
     ];
     
     this.initializeScrapers();
+    this.runInitialScrape();
   }
+
+  async runInitialScrape() {
+    console.log('Running initial scrape...');
+    await scraperQueue.add('scrapeEvents', {});
+  }
+
 
   initializeScrapers() {
     // Run scraping every 6 hours
@@ -44,9 +51,11 @@ class ScraperService {
       
       for (const scraper of this.scrapers) {
         try {
-          await scraper.scrape();
+          console.log(`Running ${scraper.constructor.name} scraper...`);
+          const result = await scraper.scrape();
+          console.log(`${scraper.constructor.name} completed: ${result || 'no return value'}`);
         } catch (error) {
-          console.error(`Error in ${scraper.constructor.name}:`, error);
+          console.error(`Error in ${scraper.constructor.name}:`, error.stack || error);
         }
       }
     });
