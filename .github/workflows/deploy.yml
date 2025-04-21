@@ -1,0 +1,41 @@
+name: Deploy
+on:
+  push:
+    branches: [aws]
+
+env:
+  AWS_REGION: eu-north-1
+  ENVIRONMENT: dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install production dependencies
+        run: yarn install --production --frozen-lockfile
+
+      - name: Zip code + dependencies
+        run: zip -r code.zip . -x "*.git*" ".github/*" "test/*" "*.env*"
+
+      - name: Upload to S3
+        run: aws s3 cp code.zip s3://${{ secrets.LAMBDA_CODE_BUCKET }}/${{ env.ENVIRONMENT }}/code.zip
+
+      - name: Deploy
+        run: |
+          aws cloudformation deploy \
+            --template-file template.yaml \
+            --stack-name meetro-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              EnvironmentName=${{ env.ENVIRONMENT }} \
+              LambdaCodeBucket=${{ secrets.LAMBDA_CODE_BUCKET }} \
+              DomainName=${{ secrets.DOMAIN_NAME }} \
+              GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }} \
+            --capabilities CAPABILITY_IAM

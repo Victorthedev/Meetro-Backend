@@ -1,0 +1,931 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Meetro Infrastructure'
+
+Parameters:
+  EnvironmentName:
+    Description: 'Environment name (prod or dev)'
+    Type: String
+    AllowedValues: [prod, dev]
+    Default: dev
+
+  DomainName:
+    Description: 'Base domain name'
+    Type: String
+    Default: 'meetro.live'
+
+  LambdaCodeBucket:
+    Description: 'S3 bucket for Lambda code'
+    Type: String
+
+  GoogleClientId:
+    Description: 'Google OAuth Client ID'
+    Type: String
+
+Resources:
+# IAM Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource: '*'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource: '*'
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:*
+                Resource: '*'
+        - PolicyName: SESAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'
+
+  # DynamoDB Tables
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-UsersTable'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-EventsTable'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: creator
+          AttributeType: S
+        - AttributeName: visibility
+          AttributeType: S
+        - AttributeName: startDate
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CreatorIndex
+          KeySchema:
+            - AttributeName: creator
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: VisibilityIndex
+          KeySchema:
+            - AttributeName: visibility
+              KeyType: HASH
+            - AttributeName: startDate
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  SharesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-SharesTable'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: sharedBy
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: SharedByIndex
+          KeySchema:
+            - AttributeName: sharedBy
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  TicketsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-TicketsTable'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EventIndex
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  PurchasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-PurchasesTable'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EventIndex
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  # S3 Bucket
+  StorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${EnvironmentName}-meetro-storage'
+      AccessControl: Private
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE]
+            AllowedOrigins: ['*']
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldFiles
+            Status: Enabled
+            ExpirationInDays: 365
+
+  # S3 Bucket
+  StorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${EnvironmentName}-meetro-storage'
+      AccessControl: Private
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE]
+            AllowedOrigins: ['*']
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldFiles
+            Status: Enabled
+            ExpirationInDays: 365
+
+  # Lambda          
+
+  # Auth Handlers
+  EmailSignUpLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-EmailSignUp'
+      Handler: auth/handlers/emailSignUp.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          COGNITO_USER_POOL_ID: !Ref UserPool
+          COGNITO_CLIENT_ID: !Ref UserPoolClient
+
+  EmailLoginLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-EmailLogin'
+      Handler: auth/handlers/emailLogin.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          COGNITO_CLIENT_ID: !Ref UserPoolClient
+
+  GoogleLoginLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GoogleLogin'
+      Handler: auth/handlers/googleLogin.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          COGNITO_USER_POOL_ID: !Ref UserPool
+
+  GetMeLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetMe'
+      Handler: auth/handlers/getMe.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+
+  UpdateProfileLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-UpdateProfile'
+      Handler: auth/handlers/updateProfile.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          COGNITO_USER_POOL_ID: !Ref UserPool
+
+  UpdateLocationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-UpdateLocation'
+      Handler: auth/handlers/updateLocation.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+
+  ConnectGoogleCalendarLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-ConnectGoogleCalendar'
+      Handler: auth/handlers/connectGoogleCalendar.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+
+  # Event Handlers
+  CreateEventLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-CreateEvent'
+      Handler: events/handlers/createEvent.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+          STORAGE_BUCKET: !Ref StorageBucket
+
+  GetEventLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetEvent'
+      Handler: events/handlers/getEvent.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+
+  GetEventsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetEvents'
+      Handler: events/handlers/getEvents.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+
+  GetMyEventsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetMyEvents'
+      Handler: events/handlers/getMyEvents.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+
+  GetPublicEventsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetPublicEvents'
+      Handler: events/handlers/getPublicEvents.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+
+  AddToCalendarLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-AddToCalendar'
+      Handler: events/handlers/addToCalendar.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+
+  TriggerScrapingLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-TriggerScraping'
+      Handler: events/handlers/triggerScraping.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+
+  # Share Handlers
+  ShareEventLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-ShareEvent'
+      Handler: shares/handlers/shareEvent.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          SHARES_TABLE: !Ref SharesTable
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+
+  ConfirmAttendanceLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-ConfirmAttendance'
+      Handler: shares/handlers/confirmAttendance.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          SHARES_TABLE: !Ref SharesTable
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+
+  GetSharesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetShares'
+      Handler: shares/handlers/getShares.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          SHARES_TABLE: !Ref SharesTable
+          EVENTS_TABLE: !Ref EventsTable
+
+  # Ticket Handlers
+  CreateTicketLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-CreateTicket'
+      Handler: tickets/handlers/createTicket.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          TICKETS_TABLE: !Ref TicketsTable
+          EVENTS_TABLE: !Ref EventsTable
+
+  PurchaseTicketLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-PurchaseTicket'
+      Handler: tickets/handlers/purchaseTicket.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          TICKETS_TABLE: !Ref TicketsTable
+          PURCHASES_TABLE: !Ref PurchasesTable
+          EVENTS_TABLE: !Ref EventsTable
+          USERS_TABLE: !Ref UsersTable
+          PAYSTACK_SECRET_KEY: !Sub '{{resolve:ssm:/${EnvironmentName}/paystack-secret-key}}'
+
+  VerifyPurchaseLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-VerifyPurchase'
+      Handler: tickets/handlers/verifyPurchase.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          PURCHASES_TABLE: !Ref PurchasesTable
+          TICKETS_TABLE: !Ref TicketsTable
+          PAYSTACK_SECRET_KEY: !Sub '{{resolve:ssm:/${EnvironmentName}/paystack-secret-key}}'
+
+  GetTicketSalesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${EnvironmentName}-GetTicketSales'
+      Handler: tickets/handlers/getTicketSales.handler
+      Runtime: nodejs14.x
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${EnvironmentName}/code.zip'
+      Environment:
+        Variables:
+          PURCHASES_TABLE: !Ref PurchasesTable
+          TICKETS_TABLE: !Ref TicketsTable
+          EVENTS_TABLE: !Ref EventsTable
+
+  # API Gateway
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${EnvironmentName}-MeetroAPI'
+      Description: 'Meetro Complete API Gateway'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # Auth Endpoints
+  ApiResourceAuth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: 'auth'
+
+  # /auth/signup
+  ApiResourceSignUp:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'signup'
+  ApiMethodSignUp:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceSignUp
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailSignUpLambda.Arn}/invocations'
+
+  # /auth/login
+  ApiResourceLogin:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'login'
+  ApiMethodLogin:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceLogin
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailLoginLambda.Arn}/invocations'
+
+  # /auth/google
+  ApiResourceGoogle:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'google'
+  ApiMethodGoogle:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceGoogle
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GoogleLoginLambda.Arn}/invocations'
+
+  # /auth/me
+  ApiResourceMe:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'me'
+  ApiMethodMe:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceMe
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMeLambda.Arn}/invocations'
+
+  # /auth/profile
+  ApiResourceProfile:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'profile'
+  ApiMethodProfile:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceProfile
+      HttpMethod: PUT
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateProfileLambda.Arn}/invocations'
+
+  # /auth/location
+  ApiResourceLocation:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'location'
+  ApiMethodLocation:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceLocation
+      HttpMethod: PUT
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateLocationLambda.Arn}/invocations'
+
+  # /auth/calendar
+  ApiResourceCalendar:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceAuth
+      PathPart: 'calendar'
+  ApiMethodCalendar:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceCalendar
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectGoogleCalendarLambda.Arn}/invocations'
+
+  # Events Endpoints
+  ApiResourceEvents:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: 'events'
+
+  # /events (POST)
+  ApiMethodCreateEvent:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceEvents
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateEventLambda.Arn}/invocations'
+
+  # /events/{id} (GET)
+  ApiResourceEventById:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceEvents
+      PathPart: '{id}'
+  ApiMethodGetEvent:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceEventById
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventLambda.Arn}/invocations'
+
+  # /events/public (GET)
+  ApiResourcePublicEvents:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceEvents
+      PathPart: 'public'
+  ApiMethodPublicEvents:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourcePublicEvents
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetPublicEventsLambda.Arn}/invocations'
+
+  # /events/me (GET)
+  ApiResourceMyEvents:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceEvents
+      PathPart: 'me'
+  ApiMethodMyEvents:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceMyEvents
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMyEventsLambda.Arn}/invocations'
+
+  # /events/{id}/calendar (POST)
+  ApiResourceEventCalendar:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceEventById
+      PathPart: 'calendar'
+  ApiMethodAddToCalendar:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceEventCalendar
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarLambda.Arn}/invocations'
+
+  # Shares Endpoints
+  ApiResourceShares:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: 'shares'
+
+  # /shares (POST)
+  ApiMethodShareEvent:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceShares
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations'
+
+  # /shares/{id}/confirm (POST)
+  ApiResourceShareConfirm:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceShares
+      PathPart: '{id}/confirm'
+  ApiMethodConfirmAttendance:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceShareConfirm
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations'
+
+  # Tickets Endpoints
+  ApiResourceTickets:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: 'tickets'
+
+  # /tickets (POST)
+  ApiMethodCreateTicket:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceTickets
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTicketLambda.Arn}/invocations'
+
+  # /tickets/purchase (POST)
+  ApiResourcePurchase:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceTickets
+      PathPart: 'purchase'
+  ApiMethodPurchaseTicket:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourcePurchase
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PurchaseTicketLambda.Arn}/invocations'
+
+  # /tickets/verify (POST)
+  ApiResourceVerify:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ApiResourceTickets
+      PathPart: 'verify'
+  ApiMethodVerifyPurchase:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiResourceVerify
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyPurchaseLambda.Arn}/invocations'
+
+  # API Gateway Authorizer
+  ApiAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: !Sub '${EnvironmentName}-CognitoAuthorizer'
+      RestApiId: !Ref RestApi
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      ProviderARNs:
+        - !GetAtt UserPool.Arn
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiMethodSignUp
+      - ApiMethodLogin
+      - ApiMethodGoogle
+      - ApiMethodMe
+      - ApiMethodProfile
+      - ApiMethodLocation
+      - ApiMethodCalendar
+      - ApiMethodCreateEvent
+      - ApiMethodGetEvent
+      - ApiMethodPublicEvents
+      - ApiMethodMyEvents
+      - ApiMethodAddToCalendar
+      - ApiMethodShareEvent
+      - ApiMethodConfirmAttendance
+      - ApiMethodCreateTicket
+      - ApiMethodPurchaseTicket
+      - ApiMethodVerifyPurchase
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: !Ref EnvironmentName
+
+Outputs:
+  APIEndpoint:
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  StorageBucketName:
+    Value: !Ref StorageBucket
