@@ -1,80 +1,80 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Meetro Infrastructure'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Meetro Infrastructure"
 
 Parameters:
   EnvironmentName:
-    Description: 'Environment name (prod or dev)'
+    Description: "Environment name (prod or dev)"
     Type: String
     AllowedValues: [prod, dev]
     Default: dev
 
   DomainName:
-    Description: 'Base domain name'
+    Description: "Base domain name"
     Type: String
-    Default: 'meetro.live'
+    Default: "meetro.live"
 
   LambdaCodeBucket:
-    Description: 'S3 bucket for Lambda code'
+    Description: "S3 bucket for Lambda code"
     Type: String
 
   GoogleClientId:
-    Description: 'Google OAuth Client ID'
+    Description: "Google OAuth Client ID"
     Type: String
 
 Resources:
-# IAM Role
+  # IAM Role
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: [lambda.amazonaws.com]
-            Action: ['sts:AssumeRole']
+            Action: ["sts:AssumeRole"]
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
         - PolicyName: DynamoDBAccess
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - dynamodb:*
-                Resource: '*'
+                Resource: "*"
         - PolicyName: S3Access
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - s3:*
-                Resource: '*'
+                Resource: "*"
         - PolicyName: CognitoAccess
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - cognito-idp:*
-                Resource: '*'
+                Resource: "*"
         - PolicyName: SESAccess
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - ses:SendEmail
                   - ses:SendRawEmail
-                Resource: '*'
+                Resource: "*"
 
   # Cognito User Pool
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub '${EnvironmentName}-MeetroUsers'
+      UserPoolName: !Sub "${EnvironmentName}-MeetroUsers"
       AutoVerifiedAttributes:
         - email
       UsernameAttributes:
@@ -89,19 +89,18 @@ Resources:
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub '${EnvironmentName}-MeetroClient'
+      ClientName: !Sub "${EnvironmentName}-MeetroClient"
       UserPoolId: !Ref UserPool
       GenerateSecret: false
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-             
 
   # DynamoDB Tables
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${EnvironmentName}-UsersTable'
+      TableName: !Sub "${EnvironmentName}-UsersTable"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -122,7 +121,7 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${EnvironmentName}-EventsTable'
+      TableName: !Sub "${EnvironmentName}-EventsTable"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -155,7 +154,7 @@ Resources:
   SharesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${EnvironmentName}-SharesTable'
+      TableName: !Sub "${EnvironmentName}-SharesTable"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -176,7 +175,7 @@ Resources:
   TicketsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${EnvironmentName}-TicketsTable'
+      TableName: !Sub "${EnvironmentName}-TicketsTable"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -197,7 +196,7 @@ Resources:
   PurchasesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${EnvironmentName}-PurchasesTable'
+      TableName: !Sub "${EnvironmentName}-PurchasesTable"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -219,31 +218,31 @@ Resources:
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${EnvironmentName}-meetro-storage'
+      BucketName: !Sub "${EnvironmentName}-meetro-storage"
       AccessControl: Private
       CorsConfiguration:
         CorsRules:
-          - AllowedHeaders: ['*']
+          - AllowedHeaders: ["*"]
             AllowedMethods: [GET, PUT, POST, DELETE]
-            AllowedOrigins: ['*']
+            AllowedOrigins: ["*"]
       LifecycleConfiguration:
         Rules:
           - Id: DeleteOldFiles
             Status: Enabled
             ExpirationInDays: 365
 
-  # Lambda          
+  # Lambda
 
   # Auth Handlers
   EmailSignUpLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-EmailSignUp'
+      FunctionName: !Sub "${EnvironmentName}-EmailSignUp"
       Handler: auth/handlers/emailSignUp.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -253,12 +252,12 @@ Resources:
   EmailLoginLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-EmailLogin'
+      FunctionName: !Sub "${EnvironmentName}-EmailLogin"
       Handler: auth/handlers/emailLogin.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -267,12 +266,12 @@ Resources:
   GoogleLoginLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GoogleLogin'
+      FunctionName: !Sub "${EnvironmentName}-GoogleLogin"
       Handler: auth/handlers/googleLogin.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -282,12 +281,12 @@ Resources:
   GetMeLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetMe'
+      FunctionName: !Sub "${EnvironmentName}-GetMe"
       Handler: auth/handlers/getMe.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -295,12 +294,12 @@ Resources:
   UpdateProfileLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-UpdateProfile'
+      FunctionName: !Sub "${EnvironmentName}-UpdateProfile"
       Handler: auth/handlers/updateProfile.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -309,12 +308,12 @@ Resources:
   UpdateLocationLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-UpdateLocation'
+      FunctionName: !Sub "${EnvironmentName}-UpdateLocation"
       Handler: auth/handlers/updateLocation.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -322,12 +321,12 @@ Resources:
   ConnectGoogleCalendarLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-ConnectGoogleCalendar'
+      FunctionName: !Sub "${EnvironmentName}-ConnectGoogleCalendar"
       Handler: auth/handlers/connectGoogleCalendar.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -337,12 +336,12 @@ Resources:
   CreateEventLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-CreateEvent'
+      FunctionName: !Sub "${EnvironmentName}-CreateEvent"
       Handler: events/handlers/createEvent.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -352,12 +351,12 @@ Resources:
   GetEventLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetEvent'
+      FunctionName: !Sub "${EnvironmentName}-GetEvent"
       Handler: events/handlers/getEvent.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -365,12 +364,12 @@ Resources:
   GetEventsLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetEvents'
+      FunctionName: !Sub "${EnvironmentName}-GetEvents"
       Handler: events/handlers/getEvents.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -378,12 +377,12 @@ Resources:
   GetMyEventsLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetMyEvents'
+      FunctionName: !Sub "${EnvironmentName}-GetMyEvents"
       Handler: events/handlers/getMyEvents.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -392,12 +391,12 @@ Resources:
   GetPublicEventsLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetPublicEvents'
+      FunctionName: !Sub "${EnvironmentName}-GetPublicEvents"
       Handler: events/handlers/getPublicEvents.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -405,12 +404,12 @@ Resources:
   AddToCalendarLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-AddToCalendar'
+      FunctionName: !Sub "${EnvironmentName}-AddToCalendar"
       Handler: events/handlers/addToCalendar.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -419,12 +418,12 @@ Resources:
   TriggerScrapingLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-TriggerScraping'
+      FunctionName: !Sub "${EnvironmentName}-TriggerScraping"
       Handler: events/handlers/triggerScraping.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           EVENTS_TABLE: !Ref EventsTable
@@ -433,12 +432,12 @@ Resources:
   ShareEventLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-ShareEvent'
+      FunctionName: !Sub "${EnvironmentName}-ShareEvent"
       Handler: shares/handlers/shareEvent.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           SHARES_TABLE: !Ref SharesTable
@@ -448,12 +447,12 @@ Resources:
   ConfirmAttendanceLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-ConfirmAttendance'
+      FunctionName: !Sub "${EnvironmentName}-ConfirmAttendance"
       Handler: shares/handlers/confirmAttendance.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           SHARES_TABLE: !Ref SharesTable
@@ -463,12 +462,12 @@ Resources:
   GetSharesLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetShares'
+      FunctionName: !Sub "${EnvironmentName}-GetShares"
       Handler: shares/handlers/getShares.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           SHARES_TABLE: !Ref SharesTable
@@ -478,12 +477,12 @@ Resources:
   CreateTicketLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-CreateTicket'
+      FunctionName: !Sub "${EnvironmentName}-CreateTicket"
       Handler: tickets/handlers/createTicket.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           TICKETS_TABLE: !Ref TicketsTable
@@ -492,12 +491,12 @@ Resources:
   PurchaseTicketLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-PurchaseTicket'
+      FunctionName: !Sub "${EnvironmentName}-PurchaseTicket"
       Handler: tickets/handlers/purchaseTicket.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           TICKETS_TABLE: !Ref TicketsTable
@@ -509,12 +508,12 @@ Resources:
   VerifyPurchaseLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-VerifyPurchase'
+      FunctionName: !Sub "${EnvironmentName}-VerifyPurchase"
       Handler: tickets/handlers/verifyPurchase.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           PURCHASES_TABLE: !Ref PurchasesTable
@@ -524,12 +523,12 @@ Resources:
   GetTicketSalesLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${EnvironmentName}-GetTicketSales'
+      FunctionName: !Sub "${EnvironmentName}-GetTicketSales"
       Handler: tickets/handlers/getTicketSales.handler
       Runtime: nodejs14.x
       Code:
         S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub '${EnvironmentName}/code.zip'
+        S3Key: !Sub "${EnvironmentName}/code.zip"
       Environment:
         Variables:
           PURCHASES_TABLE: !Ref PurchasesTable
@@ -540,8 +539,8 @@ Resources:
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub '${EnvironmentName}-MeetroAPI'
-      Description: 'Meetro Complete API Gateway'
+      Name: !Sub "${EnvironmentName}-MeetroAPI"
+      Description: "Meetro Complete API Gateway"
       EndpointConfiguration:
         Types:
           - REGIONAL
@@ -552,7 +551,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: 'auth'
+      PathPart: "auth"
 
   # /auth/signup
   ApiResourceSignUp:
@@ -560,7 +559,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'signup'
+      PathPart: "signup"
   ApiMethodSignUp:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -571,7 +570,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailSignUpLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailSignUpLambda.Arn}/invocations"
 
   # /auth/login
   ApiResourceLogin:
@@ -579,7 +578,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'login'
+      PathPart: "login"
   ApiMethodLogin:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -590,7 +589,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailLoginLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailLoginLambda.Arn}/invocations"
 
   # /auth/google
   ApiResourceGoogle:
@@ -598,7 +597,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'google'
+      PathPart: "google"
   ApiMethodGoogle:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -609,7 +608,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GoogleLoginLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GoogleLoginLambda.Arn}/invocations"
 
   # /auth/me
   ApiResourceMe:
@@ -617,7 +616,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'me'
+      PathPart: "me"
   ApiMethodMe:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -629,7 +628,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMeLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMeLambda.Arn}/invocations"
 
   # /auth/profile
   ApiResourceProfile:
@@ -637,7 +636,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'profile'
+      PathPart: "profile"
   ApiMethodProfile:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -649,7 +648,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateProfileLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateProfileLambda.Arn}/invocations"
 
   # /auth/location
   ApiResourceLocation:
@@ -657,7 +656,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'location'
+      PathPart: "location"
   ApiMethodLocation:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -669,7 +668,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateLocationLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateLocationLambda.Arn}/invocations"
 
   # /auth/calendar
   ApiResourceCalendar:
@@ -677,7 +676,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceAuth
-      PathPart: 'calendar'
+      PathPart: "calendar"
   ApiMethodCalendar:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -689,7 +688,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectGoogleCalendarLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectGoogleCalendarLambda.Arn}/invocations"
 
   # Events Endpoints
   ApiResourceEvents:
@@ -697,7 +696,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: 'events'
+      PathPart: "events"
 
   # /events (POST)
   ApiMethodCreateEvent:
@@ -711,7 +710,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateEventLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateEventLambda.Arn}/invocations"
 
   # /events/{id} (GET)
   ApiResourceEventById:
@@ -719,7 +718,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceEvents
-      PathPart: '{id}'
+      PathPart: "{id}"
   ApiMethodGetEvent:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -730,7 +729,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventLambda.Arn}/invocations"
 
   # /events/public (GET)
   ApiResourcePublicEvents:
@@ -738,7 +737,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceEvents
-      PathPart: 'public'
+      PathPart: "public"
   ApiMethodPublicEvents:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -749,7 +748,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetPublicEventsLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetPublicEventsLambda.Arn}/invocations"
 
   # /events/me (GET)
   ApiResourceMyEvents:
@@ -757,7 +756,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceEvents
-      PathPart: 'me'
+      PathPart: "me"
   ApiMethodMyEvents:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -769,7 +768,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMyEventsLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMyEventsLambda.Arn}/invocations"
 
   # /events/{id}/calendar (POST)
   ApiResourceEventCalendar:
@@ -777,7 +776,7 @@ Resources:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceEventById
-      PathPart: 'calendar'
+      PathPart: "calendar"
   ApiMethodAddToCalendar:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -789,7 +788,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarLambda.Arn}/invocations"
 
 # Shares Endpoints
 ApiResourceShares:
@@ -797,7 +796,7 @@ ApiResourceShares:
   Properties:
     RestApiId: !Ref RestApi
     ParentId: !GetAtt RestApi.RootResourceId
-    PathPart: 'shares'
+    PathPart: "shares"
 
 # /shares (POST)
 ApiMethodShareEvent:
@@ -811,7 +810,7 @@ ApiMethodShareEvent:
     Integration:
       Type: AWS_PROXY
       IntegrationHttpMethod: POST
-      Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations'
+      Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations"
 
 # /shares/{id}
 ApiResourceShareById:
@@ -819,7 +818,7 @@ ApiResourceShareById:
   Properties:
     RestApiId: !Ref RestApi
     ParentId: !Ref ApiResourceShares
-    PathPart: '{id}'
+    PathPart: "{id}"
 
 # /shares/{id}/confirm
 ApiResourceShareConfirm:
@@ -827,7 +826,7 @@ ApiResourceShareConfirm:
   Properties:
     RestApiId: !Ref RestApi
     ParentId: !Ref ApiResourceShareById
-    PathPart: 'confirm'
+    PathPart: "confirm"
 
 ApiMethodConfirmAttendance:
   Type: AWS::ApiGateway::Method
@@ -840,7 +839,7 @@ ApiMethodConfirmAttendance:
     Integration:
       Type: AWS_PROXY
       IntegrationHttpMethod: POST
-      Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations'
+      Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations"
 
   # Tickets Endpoints
   ApiResourceTickets:
@@ -848,7 +847,7 @@ ApiMethodConfirmAttendance:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: 'tickets'
+      PathPart: "tickets"
 
   # /tickets (POST)
   ApiMethodCreateTicket:
@@ -862,7 +861,7 @@ ApiMethodConfirmAttendance:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTicketLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTicketLambda.Arn}/invocations"
 
   # /tickets/purchase (POST)
   ApiResourcePurchase:
@@ -870,7 +869,7 @@ ApiMethodConfirmAttendance:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceTickets
-      PathPart: 'purchase'
+      PathPart: "purchase"
   ApiMethodPurchaseTicket:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -882,7 +881,7 @@ ApiMethodConfirmAttendance:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PurchaseTicketLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PurchaseTicketLambda.Arn}/invocations"
 
   # /tickets/verify (POST)
   ApiResourceVerify:
@@ -890,7 +889,7 @@ ApiMethodConfirmAttendance:
     Properties:
       RestApiId: !Ref RestApi
       ParentId: !Ref ApiResourceTickets
-      PathPart: 'verify'
+      PathPart: "verify"
   ApiMethodVerifyPurchase:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -901,13 +900,13 @@ ApiMethodConfirmAttendance:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyPurchaseLambda.Arn}/invocations'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyPurchaseLambda.Arn}/invocations"
 
   # API Gateway Authorizer
   ApiAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: !Sub '${EnvironmentName}-CognitoAuthorizer'
+      Name: !Sub "${EnvironmentName}-CognitoAuthorizer"
       RestApiId: !Ref RestApi
       Type: COGNITO_USER_POOLS
       IdentitySource: method.request.header.Authorization
@@ -941,7 +940,7 @@ ApiMethodConfirmAttendance:
 
 Outputs:
   APIEndpoint:
-    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}"
   UserPoolId:
     Value: !Ref UserPool
   UserPoolClientId:
