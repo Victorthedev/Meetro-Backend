@@ -791,47 +791,56 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarLambda.Arn}/invocations'
 
-  # Shares Endpoints
-  ApiResourceShares:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: 'shares'
+# Shares Endpoints
+ApiResourceShares:
+  Type: AWS::ApiGateway::Resource
+  Properties:
+    RestApiId: !Ref RestApi
+    ParentId: !GetAtt RestApi.RootResourceId
+    PathPart: 'shares'
 
-  # /shares (POST)
-  ApiMethodShareEvent:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceShares
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations'
+# /shares (POST)
+ApiMethodShareEvent:
+  Type: AWS::ApiGateway::Method
+  Properties:
+    RestApiId: !Ref RestApi
+    ResourceId: !Ref ApiResourceShares
+    HttpMethod: POST
+    AuthorizationType: COGNITO_USER_POOLS
+    AuthorizerId: !Ref ApiAuthorizer
+    Integration:
+      Type: AWS_PROXY
+      IntegrationHttpMethod: POST
+      Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations'
 
-  # /shares/{id}/confirm (POST)
-  ApiResourceShareConfirm:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceShares
-      PathPart: '{id}/confirm'
-  ApiMethodConfirmAttendance:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceShareConfirm
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations'
+# /shares/{id}
+ApiResourceShareById:
+  Type: AWS::ApiGateway::Resource
+  Properties:
+    RestApiId: !Ref RestApi
+    ParentId: !Ref ApiResourceShares
+    PathPart: '{id}'
+
+# /shares/{id}/confirm
+ApiResourceShareConfirm:
+  Type: AWS::ApiGateway::Resource
+  Properties:
+    RestApiId: !Ref RestApi
+    ParentId: !Ref ApiResourceShareById
+    PathPart: 'confirm'
+
+ApiMethodConfirmAttendance:
+  Type: AWS::ApiGateway::Method
+  Properties:
+    RestApiId: !Ref RestApi
+    ResourceId: !Ref ApiResourceShareConfirm
+    HttpMethod: POST
+    AuthorizationType: COGNITO_USER_POOLS
+    AuthorizerId: !Ref ApiAuthorizer
+    Integration:
+      Type: AWS_PROXY
+      IntegrationHttpMethod: POST
+      Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations'
 
   # Tickets Endpoints
   ApiResourceTickets:
