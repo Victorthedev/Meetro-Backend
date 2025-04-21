@@ -70,6 +70,32 @@ Resources:
                   - ses:SendRawEmail
                 Resource: '*'
 
+  # Cognito User Pool
+UserPool:
+  Type: AWS::Cognito::UserPool
+  Properties:
+    UserPoolName: !Sub '${EnvironmentName}-MeetroUsers'
+    AutoVerifiedAttributes:
+      - email
+    UsernameAttributes:
+      - email
+    Policies:
+      PasswordPolicy:
+        MinimumLength: 8
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireUppercase: true
+
+UserPoolClient:
+  Type: AWS::Cognito::UserPoolClient
+  Properties:
+    ClientName: !Sub '${EnvironmentName}-MeetroClient'
+    UserPoolId: !Ref UserPool
+    GenerateSecret: false
+    ExplicitAuthFlows:
+      - ALLOW_USER_PASSWORD_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH              
+
   # DynamoDB Tables
   UsersTable:
     Type: AWS::DynamoDB::Table
@@ -187,23 +213,6 @@ Resources:
           Projection:
             ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
-
-  # S3 Bucket
-  StorageBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub '${EnvironmentName}-meetro-storage'
-      AccessControl: Private
-      CorsConfiguration:
-        CorsRules:
-          - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE]
-            AllowedOrigins: ['*']
-      LifecycleConfiguration:
-        Rules:
-          - Id: DeleteOldFiles
-            Status: Enabled
-            ExpirationInDays: 365
 
   # S3 Bucket
   StorageBucket:
