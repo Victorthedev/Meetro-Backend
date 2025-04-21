@@ -238,6 +238,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-EmailSignUp"
       Handler: auth/handlers/emailSignUp.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -253,6 +254,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-EmailLogin"
       Handler: auth/handlers/emailLogin.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -267,6 +269,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GoogleLogin"
       Handler: auth/handlers/googleLogin.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -282,6 +285,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetMe"
       Handler: auth/handlers/getMe.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -295,6 +299,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-UpdateProfile"
       Handler: auth/handlers/updateProfile.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -309,6 +314,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-UpdateLocation"
       Handler: auth/handlers/updateLocation.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -322,6 +328,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-ConnectGoogleCalendar"
       Handler: auth/handlers/connectGoogleCalendar.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -337,6 +344,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-CreateEvent"
       Handler: events/handlers/createEvent.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -352,6 +360,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetEvent"
       Handler: events/handlers/getEvent.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -365,6 +374,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetEvents"
       Handler: events/handlers/getEvents.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -378,6 +388,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetMyEvents"
       Handler: events/handlers/getMyEvents.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -392,6 +403,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetPublicEvents"
       Handler: events/handlers/getPublicEvents.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -405,6 +417,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-AddToCalendar"
       Handler: events/handlers/addToCalendar.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -419,6 +432,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-TriggerScraping"
       Handler: events/handlers/triggerScraping.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -433,6 +447,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-ShareEvent"
       Handler: shares/handlers/shareEvent.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -448,6 +463,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-ConfirmAttendance"
       Handler: shares/handlers/confirmAttendance.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -463,6 +479,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetShares"
       Handler: shares/handlers/getShares.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -478,6 +495,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-CreateTicket"
       Handler: tickets/handlers/createTicket.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -492,6 +510,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-PurchaseTicket"
       Handler: tickets/handlers/purchaseTicket.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -509,6 +528,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-VerifyPurchase"
       Handler: tickets/handlers/verifyPurchase.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
@@ -524,6 +544,7 @@ Resources:
       FunctionName: !Sub "${EnvironmentName}-GetTicketSales"
       Handler: tickets/handlers/getTicketSales.handler
       Runtime: nodejs14.x
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: !Ref LambdaCodeBucket
         S3Key: !Sub "${EnvironmentName}/code.zip"
