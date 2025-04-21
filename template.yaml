@@ -71,30 +71,31 @@ Resources:
                 Resource: '*'
 
   # Cognito User Pool
-UserPool:
-  Type: AWS::Cognito::UserPool
-  Properties:
-    UserPoolName: !Sub '${EnvironmentName}-MeetroUsers'
-    AutoVerifiedAttributes:
-      - email
-    UsernameAttributes:
-      - email
-    Policies:
-      PasswordPolicy:
-        MinimumLength: 8
-        RequireLowercase: true
-        RequireNumbers: true
-        RequireUppercase: true
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${EnvironmentName}-MeetroUsers'
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: true
 
-UserPoolClient:
-  Type: AWS::Cognito::UserPoolClient
-  Properties:
-    ClientName: !Sub '${EnvironmentName}-MeetroClient'
-    UserPoolId: !Ref UserPool
-    GenerateSecret: false
-    ExplicitAuthFlows:
-      - ALLOW_USER_PASSWORD_AUTH
-      - ALLOW_REFRESH_TOKEN_AUTH              
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${EnvironmentName}-MeetroClient'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+             
 
   # DynamoDB Tables
   UsersTable:
