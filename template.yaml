@@ -504,7 +504,7 @@ Resources:
           PURCHASES_TABLE: !Ref PurchasesTable
           EVENTS_TABLE: !Ref EventsTable
           USERS_TABLE: !Ref UsersTable
-          PAYSTACK_SECRET_KEY: !Sub '{{resolve:ssm:/${EnvironmentName}/paystack-secret-key}}'
+          PAYSTACK_SECRET_KEY: "dummy-value"
 
   VerifyPurchaseLambda:
     Type: AWS::Lambda::Function
@@ -519,7 +519,7 @@ Resources:
         Variables:
           PURCHASES_TABLE: !Ref PurchasesTable
           TICKETS_TABLE: !Ref TicketsTable
-          PAYSTACK_SECRET_KEY: !Sub '{{resolve:ssm:/${EnvironmentName}/paystack-secret-key}}'
+          PAYSTACK_SECRET_KEY: "dummy-value"
 
   GetTicketSalesLambda:
     Type: AWS::Lambda::Function
