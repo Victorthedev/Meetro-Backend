@@ -1,160 +1,171 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: "Meetro Infrastructure"
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Meetro Backend API for Dev Environment in eu-north-1
 
 Parameters:
   EnvironmentName:
-    Description: "Environment name (prod or dev)"
     Type: String
-    AllowedValues: [prod, dev]
     Default: dev
-
-  DomainName:
-    Description: "Base domain name"
-    Type: String
-    Default: "meetro.live"
-
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment to deploy (dev or prod)
   LambdaCodeBucket:
-    Description: "S3 bucket for Lambda code"
     Type: String
-
+    Description: S3 bucket containing the Lambda code
+  DomainName:
+    Type: String
+    Description: Domain name for the API Gateway
   GoogleClientId:
-    Description: "Google OAuth Client ID"
     Type: String
+    Description: Google Client ID for OAuth
 
 Resources:
-  # IAM Role
+  # IAM Role for Lambda Functions
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              Service: [lambda.amazonaws.com]
-            Action: ["sts:AssumeRole"]
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AdministratorAccess
       Policies:
-        - PolicyName: DynamoDBAccess
+        - PolicyName: LambdaLogging
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - dynamodb:*
-                Resource: "*"
-        - PolicyName: S3Access
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:*
-                Resource: "*"
-        - PolicyName: CognitoAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cognito-idp:*
-                Resource: "*"
-        - PolicyName: SESAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ses:SendEmail
-                  - ses:SendRawEmail
-                Resource: "*"
-
-  # Cognito User Pool
-  UserPool:
-    Type: AWS::Cognito::UserPool
-    Properties:
-      UserPoolName: !Sub "${EnvironmentName}-MeetroUsers"
-      AutoVerifiedAttributes:
-        - email
-      UsernameAttributes:
-        - email
-      Policies:
-        PasswordPolicy:
-          MinimumLength: 8
-          RequireLowercase: true
-          RequireNumbers: true
-          RequireUppercase: true
-
-  UserPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      ClientName: !Sub "${EnvironmentName}-MeetroClient"
-      UserPoolId: !Ref UserPool
-      GenerateSecret: false
-      ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
 
   # DynamoDB Tables
-  UsersTable:
+  MeetroUsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${EnvironmentName}-UsersTable"
+      TableName: !Sub MeetroUsers-${EnvironmentName}
       AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: email
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: userId
           KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: EmailIndex
-          KeySchema:
-            - AttributeName: email
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
 
-  EventsTable:
+  MeetroEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${EnvironmentName}-EventsTable"
+      TableName: !Sub MeetroEvents-${EnvironmentName}
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
         - AttributeName: creator
           AttributeType: S
-        - AttributeName: visibility
+        - AttributeName: isPrivate
           AttributeType: S
-        - AttributeName: startDate
+        - AttributeName: location.state
           AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: CreatorIndex
+        - IndexName: byCreator
           KeySchema:
             - AttributeName: creator
               KeyType: HASH
           Projection:
             ProjectionType: ALL
-        - IndexName: VisibilityIndex
+        - IndexName: byPrivacyAndState
           KeySchema:
-            - AttributeName: visibility
+            - AttributeName: isPrivate
               KeyType: HASH
-            - AttributeName: startDate
+            - AttributeName: location.state
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
 
-  SharesTable:
+  MeetroTicketsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${EnvironmentName}-SharesTable"
+      TableName: !Sub MeetroTickets-${EnvironmentName}
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byEventId
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  MeetroPurchasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub MeetroPurchases-${EnvironmentName}
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: paymentReference
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byEventId
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: byPaymentReference
+          KeySchema:
+            - AttributeName: paymentReference
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  MeetroDonationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub MeetroDonationsTable-${EnvironmentName}
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byEventId
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  MeetroSharesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub MeetroShares-${EnvironmentName}
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -164,7 +175,7 @@ Resources:
         - AttributeName: id
           KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: SharedByIndex
+        - IndexName: bySharedBy
           KeySchema:
             - AttributeName: sharedBy
               KeyType: HASH
@@ -172,797 +183,1676 @@ Resources:
             ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
 
-  TicketsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "${EnvironmentName}-TicketsTable"
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: eventId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: EventIndex
-          KeySchema:
-            - AttributeName: eventId
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-      BillingMode: PAY_PER_REQUEST
-
-  PurchasesTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "${EnvironmentName}-PurchasesTable"
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: eventId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: EventIndex
-          KeySchema:
-            - AttributeName: eventId
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-      BillingMode: PAY_PER_REQUEST
-
-  # S3 Bucket
-  StorageBucket:
+  # S3 Bucket for Uploads
+  UploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${EnvironmentName}-meetro-storage"
-      AccessControl: Private
+      BucketName: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
       CorsConfiguration:
         CorsRules:
-          - AllowedHeaders: ["*"]
-            AllowedMethods: [GET, PUT, POST, DELETE]
-            AllowedOrigins: ["*"]
-      LifecycleConfiguration:
-        Rules:
-          - Id: DeleteOldFiles
-            Status: Enabled
-            ExpirationInDays: 365
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['PUT']
+            AllowedOrigins: ['*']
+            MaxAge: 3000
 
-  # Lambda Functions
-  EmailSignUpLambda:
-    Type: AWS::Lambda::Function
+  # Cognito User Pool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
     Properties:
-      FunctionName: !Sub "${EnvironmentName}-EmailSignUp"
-      Handler: auth/handlers/emailSignUp.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-          COGNITO_USER_POOL_ID: !Ref UserPool
-          COGNITO_CLIENT_ID: !Ref UserPoolClient
+      UserPoolName: !Sub MeetroUserPool-${EnvironmentName}
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: given_name
+          AttributeDataType: String
+          Mutable: true
+        - Name: family_name
+          AttributeDataType: String
+          Mutable: true
 
-  EmailLoginLambda:
-    Type: AWS::Lambda::Function
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
     Properties:
-      FunctionName: !Sub "${EnvironmentName}-EmailLogin"
-      Handler: auth/handlers/emailLogin.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-          COGNITO_CLIENT_ID: !Ref UserPoolClient
+      ClientName: !Sub MeetroUserPoolClient-${EnvironmentName}
+      UserPoolId: !Ref CognitoUserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: false
 
-  GoogleLoginLambda:
-    Type: AWS::Lambda::Function
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
     Properties:
-      FunctionName: !Sub "${EnvironmentName}-GoogleLogin"
-      Handler: auth/handlers/googleLogin.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          COGNITO_USER_POOL_ID: !Ref UserPool
-
-  GetMeLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetMe"
-      Handler: auth/handlers/getMe.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-
-  UpdateProfileLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-UpdateProfile"
-      Handler: auth/handlers/updateProfile.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-          COGNITO_USER_POOL_ID: !Ref UserPool
-
-  UpdateLocationLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-UpdateLocation"
-      Handler: auth/handlers/updateLocation.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-
-  ConnectGoogleCalendarLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-ConnectGoogleCalendar"
-      Handler: auth/handlers/connectGoogleCalendar.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-
-  # Event Handlers
-  CreateEventLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-CreateEvent"
-      Handler: events/handlers/createEvent.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-          STORAGE_BUCKET: !Ref StorageBucket
-
-  GetEventLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetEvent"
-      Handler: events/handlers/getEvent.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-
-  GetEventsLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetEvents"
-      Handler: events/handlers/getEvents.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-
-  GetMyEventsLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetMyEvents"
-      Handler: events/handlers/getMyEvents.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-
-  GetPublicEventsLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetPublicEvents"
-      Handler: events/handlers/getPublicEvents.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-
-  AddToCalendarLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-AddToCalendar"
-      Handler: events/handlers/addToCalendar.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-
-  TriggerScrapingLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-TriggerScraping"
-      Handler: events/handlers/triggerScraping.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          EVENTS_TABLE: !Ref EventsTable
-
-  # Share Handlers
-  ShareEventLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-ShareEvent"
-      Handler: shares/handlers/shareEvent.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          SHARES_TABLE: !Ref SharesTable
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-
-  ConfirmAttendanceLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-ConfirmAttendance"
-      Handler: shares/handlers/confirmAttendance.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          SHARES_TABLE: !Ref SharesTable
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-
-  GetSharesLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetShares"
-      Handler: shares/handlers/getShares.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          SHARES_TABLE: !Ref SharesTable
-          EVENTS_TABLE: !Ref EventsTable
-
-  # Ticket Handlers
-  CreateTicketLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-CreateTicket"
-      Handler: tickets/handlers/createTicket.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          TICKETS_TABLE: !Ref TicketsTable
-          EVENTS_TABLE: !Ref EventsTable
-
-  PurchaseTicketLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-PurchaseTicket"
-      Handler: tickets/handlers/purchaseTicket.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          TICKETS_TABLE: !Ref TicketsTable
-          PURCHASES_TABLE: !Ref PurchasesTable
-          EVENTS_TABLE: !Ref EventsTable
-          USERS_TABLE: !Ref UsersTable
-          PAYSTACK_SECRET_KEY: "dummy-value"
-
-  VerifyPurchaseLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-VerifyPurchase"
-      Handler: tickets/handlers/verifyPurchase.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          PURCHASES_TABLE: !Ref PurchasesTable
-          TICKETS_TABLE: !Ref TicketsTable
-          PAYSTACK_SECRET_KEY: "dummy-value"
-
-  GetTicketSalesLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "${EnvironmentName}-GetTicketSales"
-      Handler: tickets/handlers/getTicketSales.handler
-      Runtime: nodejs14.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub "${EnvironmentName}/code.zip"
-      Environment:
-        Variables:
-          PURCHASES_TABLE: !Ref PurchasesTable
-          TICKETS_TABLE: !Ref TicketsTable
-          EVENTS_TABLE: !Ref EventsTable
+      IdentityPoolName: !Sub MeetroIdentityPool-${EnvironmentName}
+      AllowUnauthenticatedIdentities: false
+      CognitoUserPools:
+        - !Ref CognitoUserPool
 
   # API Gateway
-  RestApi:
+  ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub "${EnvironmentName}-MeetroAPI"
-      Description: "Meetro Complete API Gateway"
+      Name: !Sub MeetroApi-${EnvironmentName}
+      Description: API for Meetro Backend
       EndpointConfiguration:
         Types:
           - REGIONAL
 
-  # Auth Endpoints
-  ApiResourceAuth:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: "auth"
-
-  # /auth/signup
-  ApiResourceSignUp:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "signup"
-  ApiMethodSignUp:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceSignUp
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailSignUpLambda.Arn}/invocations"
-
-  # /auth/login
-  ApiResourceLogin:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "login"
-  ApiMethodLogin:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceLogin
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmailLoginLambda.Arn}/invocations"
-
-  # /auth/google
-  ApiResourceGoogle:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "google"
-  ApiMethodGoogle:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceGoogle
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GoogleLoginLambda.Arn}/invocations"
-
-  # /auth/me
-  ApiResourceMe:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "me"
-  ApiMethodMe:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceMe
-      HttpMethod: GET
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMeLambda.Arn}/invocations"
-
-  # /auth/profile
-  ApiResourceProfile:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "profile"
-  ApiMethodProfile:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceProfile
-      HttpMethod: PUT
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateProfileLambda.Arn}/invocations"
-
-  # /auth/location
-  ApiResourceLocation:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "location"
-  ApiMethodLocation:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceLocation
-      HttpMethod: PUT
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateLocationLambda.Arn}/invocations"
-
-  # /auth/calendar
-  ApiResourceCalendar:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceAuth
-      PathPart: "calendar"
-  ApiMethodCalendar:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceCalendar
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectGoogleCalendarLambda.Arn}/invocations"
-
-  # Events Endpoints
-  ApiResourceEvents:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: "events"
-
-  # /events (POST)
-  ApiMethodCreateEvent:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceEvents
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateEventLambda.Arn}/invocations"
-
-  # /events/{id} (GET)
-  ApiResourceEventById:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceEvents
-      PathPart: "{id}"
-  ApiMethodGetEvent:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceEventById
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventLambda.Arn}/invocations"
-
-  # /events/public (GET)
-  ApiResourcePublicEvents:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceEvents
-      PathPart: "public"
-  ApiMethodPublicEvents:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourcePublicEvents
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetPublicEventsLambda.Arn}/invocations"
-
-  # /events/me (GET)
-  ApiResourceMyEvents:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceEvents
-      PathPart: "me"
-  ApiMethodMyEvents:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceMyEvents
-      HttpMethod: GET
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMyEventsLambda.Arn}/invocations"
-
-  # /events/{id}/calendar (POST)
-  ApiResourceEventCalendar:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceEventById
-      PathPart: "calendar"
-  ApiMethodAddToCalendar:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceEventCalendar
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarLambda.Arn}/invocations"
-
-  # Shares Endpoints
-  ApiResourceShares:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: "shares"
-
-  # /shares (POST)
-  ApiMethodShareEvent:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceShares
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareEventLambda.Arn}/invocations"
-
-  # /shares/{id}
-  ApiResourceShareById:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceShares
-      PathPart: "{id}"
-
-  # /shares/{id}/confirm
-  ApiResourceShareConfirm:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceShareById
-      PathPart: "confirm"
-
-  ApiMethodConfirmAttendance:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceShareConfirm
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceLambda.Arn}/invocations"
-
-  # Tickets Endpoints
-  ApiResourceTickets:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: "tickets"
-
-  # /tickets (POST)
-  ApiMethodCreateTicket:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceTickets
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTicketLambda.Arn}/invocations"
-
-  # /tickets/purchase (POST)
-  ApiResourcePurchase:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceTickets
-      PathPart: "purchase"
-  ApiMethodPurchaseTicket:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourcePurchase
-      HttpMethod: POST
-      AuthorizationType: COGNITO_USER_POOLS
-      AuthorizerId: !Ref ApiAuthorizer
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PurchaseTicketLambda.Arn}/invocations"
-
-  # /tickets/verify (POST)
-  ApiResourceVerify:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !Ref ApiResourceTickets
-      PathPart: "verify"
-  ApiMethodVerifyPurchase:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ApiResourceVerify
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyPurchaseLambda.Arn}/invocations"
-
   # API Gateway Authorizer
-  ApiAuthorizer:
+  CognitoAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: !Sub "${EnvironmentName}-CognitoAuthorizer"
-      RestApiId: !Ref RestApi
+      Name: CognitoAuthorizer
       Type: COGNITO_USER_POOLS
       IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref ApiGatewayRestApi
       ProviderARNs:
-        - !GetAtt UserPool.Arn
+        - !GetAtt CognitoUserPool.Arn
 
-  # API Deployment
-  ApiDeployment:
+  # API Gateway Resources and Methods
+  # /signup
+  SignupResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: signup
+
+  SignupMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SignupResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SignupFunction.Arn}/invocations
+
+  # /google-signin
+  GoogleSignInResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: google-signin
+
+  GoogleSignInMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref GoogleSignInResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GoogleSignInFunction.Arn}/invocations
+
+  # /login
+  LoginResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: login
+
+  LoginMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref LoginResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LoginFunction.Arn}/invocations
+
+  # /link-google-calendar
+  LinkGoogleCalendarResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: link-google-calendar
+
+  LinkGoogleCalendarMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref LinkGoogleCalendarResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LinkGoogleCalendarFunction.Arn}/invocations
+
+  # /events
+  EventsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: events
+
+  CreateEventMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref EventsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateEventFunction.Arn}/invocations
+
+  GetEventsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref EventsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventsFunction.Arn}/invocations
+
+  # /events/{eventId}
+  EventIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref EventsResource
+      PathPart: '{eventId}'
+
+  GetEventMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref EventIdResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetEventFunction.Arn}/invocations
+
+  # /events/{eventId}/state
+  EventStateResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref EventIdResource
+      PathPart: state
+
+  UpdateStateMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref EventStateResource
+      HttpMethod: PUT
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateStateFunction.Arn}/invocations
+
+  # /events/{eventId}/add-to-calendar
+  AddToCalendarResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref EventIdResource
+      PathPart: add-to-calendar
+
+  AddToCalendarMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref AddToCalendarResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddToCalendarFunction.Arn}/invocations
+
+  # /my-events
+  MyEventsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: my-events
+
+  GetMyEventsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref MyEventsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMyEventsFunction.Arn}/invocations
+
+  # /public-events
+  PublicEventsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: public-events
+
+  GetPublicEventsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref PublicEventsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetPublicEventsFunction.Arn}/invocations
+
+  # /tickets
+  TicketsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: tickets
+
+  CreateTicketMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref TicketsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTicketFunction.Arn}/invocations
+
+  # /tickets/purchase
+  TicketsPurchaseResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref TicketsResource
+      PathPart: purchase
+
+  PurchaseTicketMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref TicketsPurchaseResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PurchaseTicketFunction.Arn}/invocations
+
+  # /tickets/verify
+  TicketsVerifyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref TicketsResource
+      PathPart: verify
+
+  VerifyPurchaseMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref TicketsVerifyResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyPurchaseFunction.Arn}/invocations
+
+  # /tickets/sales/{eventId}
+  TicketsSalesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref TicketsResource
+      PathPart: sales
+
+  TicketsSalesEventIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref TicketsSalesResource
+      PathPart: '{eventId}'
+
+  GetTicketSalesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref TicketsSalesEventIdResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetTicketSalesFunction.Arn}/invocations
+
+  # /shares
+  SharesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: shares
+
+  CreateShareMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SharesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateShareFunction.Arn}/invocations
+
+  GetSharesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SharesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetSharesFunction.Arn}/invocations
+
+  # /shares/{shareId}/confirm
+  ShareIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref SharesResource
+      PathPart: '{shareId}'
+
+  ShareConfirmResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ShareIdResource
+      PathPart: confirm
+
+  ConfirmAttendanceMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ShareConfirmResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConfirmAttendanceFunction.Arn}/invocations
+
+  # /donations
+  DonationsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: donations
+
+  CreateDonationMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref DonationsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateDonationFunction.Arn}/invocations
+
+  # /donations/verify
+  DonationsVerifyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref DonationsResource
+      PathPart: verify
+
+  VerifyDonationMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref DonationsVerifyResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyDonationFunction.Arn}/invocations
+
+  # /upload
+  UploadResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: upload
+
+  GetUploadUrlMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref UploadResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUploadUrlFunction.Arn}/invocations
+
+  # /scan-qr
+  ScanQRResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: scan-qr
+
+  ScanQRMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ScanQRResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ScanQRFunction.Arn}/invocations
+
+  # /profile
+  ProfileResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: profile
+
+  UpdateProfileMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProfileResource
+      HttpMethod: PUT
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateProfileFunction.Arn}/invocations
+
+  GetProfileMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProfileResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetProfileFunction.Arn}/invocations
+
+  # API Gateway Deployment
+  ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - ApiMethodSignUp
-      - ApiMethodLogin
-      - ApiMethodGoogle
-      - ApiMethodMe
-      - ApiMethodProfile
-      - ApiMethodLocation
-      - ApiMethodCalendar
-      - ApiMethodCreateEvent
-      - ApiMethodGetEvent
-      - ApiMethodPublicEvents
-      - ApiMethodMyEvents
-      - ApiMethodAddToCalendar
-      - ApiMethodShareEvent
-      - ApiMethodConfirmAttendance
-      - ApiMethodCreateTicket
-      - ApiMethodPurchaseTicket
-      - ApiMethodVerifyPurchase
+      - SignupMethod
+      - GoogleSignInMethod
+      - LoginMethod
+      - LinkGoogleCalendarMethod
+      - CreateEventMethod
+      - GetEventsMethod
+      - GetEventMethod
+      - UpdateStateMethod
+      - AddToCalendarMethod
+      - GetMyEventsMethod
+      - GetPublicEventsMethod
+      - CreateTicketMethod
+      - PurchaseTicketMethod
+      - VerifyPurchaseMethod
+      - GetTicketSalesMethod
+      - CreateShareMethod
+      - GetSharesMethod
+      - ConfirmAttendanceMethod
+      - CreateDonationMethod
+      - VerifyDonationMethod
+      - GetUploadUrlMethod
+      - ScanQRMethod
+      - UpdateProfileMethod
+      - GetProfileMethod
     Properties:
-      RestApiId: !Ref RestApi
+      RestApiId: !Ref ApiGatewayRestApi
       StageName: !Ref EnvironmentName
 
+  # Lambda Functions (Auth)
+  SignupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-Signup-${EnvironmentName}
+      Handler: signup.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GoogleSignInFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GoogleSignIn-${EnvironmentName}
+      Handler: googleSignIn.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  LoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-Login-${EnvironmentName}
+      Handler: login.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  LinkGoogleCalendarFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-LinkGoogleCalendar-${EnvironmentName}
+      Handler: linkGoogleCalendar.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Functions (Events)
+  CreateEventFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-CreateEvent-${EnvironmentName}
+      Handler: createEvent.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetEventFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetEvent-${EnvironmentName}
+      Handler: getEvent.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetEventsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetEvents-${EnvironmentName}
+      Handler: getEvents.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetMyEventsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetMyEvents-${EnvironmentName}
+      Handler: getMyEvents.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetPublicEventsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetPublicEvents-${EnvironmentName}
+      Handler: getPublicEvents.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  UpdateStateFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-UpdateState-${EnvironmentName}
+      Handler: updateState.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  AddToCalendarFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-AddToCalendar-${EnvironmentName}
+      Handler: addToCalendar.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Functions (Tickets)
+  CreateTicketFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-CreateTicket-${EnvironmentName}
+      Handler: createTicket.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  PurchaseTicketFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-PurchaseTicket-${EnvironmentName}
+      Handler: purchaseTicket.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  VerifyPurchaseFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-VerifyPurchase-${EnvironmentName}
+      Handler: verifyPurchase.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetTicketSalesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetTicketSales-${EnvironmentName}
+      Handler: getTicketSales.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Functions (Shares)
+  CreateShareFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-CreateShare-${EnvironmentName}
+      Handler: createShare.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetSharesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetShares-${EnvironmentName}
+      Handler: getShares.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  ConfirmAttendanceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-ConfirmAttendance-${EnvironmentName}
+      Handler: confirmAttendance.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Functions (Donations)
+  CreateDonationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-CreateDonation-${EnvironmentName}
+      Handler: createDonation.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  VerifyDonationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-VerifyDonation-${EnvironmentName}
+      Handler: verifyDonation.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Functions (Services)
+  DisburseFundsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-DisburseFunds-${EnvironmentName}
+      Handler: disburseFunds.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  DisburseFundsSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub Meetro-DisburseFundsSchedule-${EnvironmentName}
+      ScheduleExpression: rate(1 day)
+      Targets:
+        - Arn: !GetAtt DisburseFundsFunction.Arn
+          Id: DisburseFundsTarget
+
+  GetUploadUrlFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetUploadUrl-${EnvironmentName}
+      Handler: getUploadUrl.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  ScanQRFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-ScanQR-${EnvironmentName}
+      Handler: scanQR.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  UpdateProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-UpdateProfile-${EnvironmentName}
+      Handler: updateProfile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  GetProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetProfile-${EnvironmentName}
+      Handler: getProfile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: !Sub ${PAYSTACK_SECRET_KEY}
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Sub ${GOOGLE_CLIENT_SECRET}
+          TWILIO_SID: !Sub ${TWILIO_SID}
+          TWILIO_AUTH_TOKEN: !Sub ${TWILIO_AUTH_TOKEN}
+          TWILIO_PHONE_NUMBER: !Sub ${TWILIO_PHONE_NUMBER}
+          RESEND_API_KEY: !Sub ${RESEND_API_KEY}
+          RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
+
+  # Lambda Permissions for API Gateway
+  SignupLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SignupFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/signup
+
+  GoogleSignInLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GoogleSignInFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/google-signin
+
+  LoginLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LoginFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/login
+
+  LinkGoogleCalendarLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LinkGoogleCalendarFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/link-google-calendar
+
+CreateEventLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref CreateEventFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/events
+
+GetEventsLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetEventsFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/events
+
+GetEventLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetEventFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/events/{eventId}
+
+UpdateStateLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref UpdateStateFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/events/{eventId}/state
+
+AddToCalendarLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref AddToCalendarFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/events/{eventId}/add-to-calendar
+
+GetMyEventsLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetMyEventsFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/my-events
+
+GetPublicEventsLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetPublicEventsFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/public-events
+
+CreateTicketLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref CreateTicketFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/tickets
+
+PurchaseTicketLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref PurchaseTicketFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/tickets/purchase
+
+VerifyPurchaseLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref VerifyPurchaseFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/tickets/verify
+
+GetTicketSalesLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetTicketSalesFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/tickets/sales/{eventId}
+
+CreateShareLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref CreateShareFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/shares
+
+GetSharesLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetSharesFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/shares
+
+ConfirmAttendanceLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref ConfirmAttendanceFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/shares/{shareId}/confirm
+
+CreateDonationLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref CreateDonationFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/donations
+
+VerifyDonationLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref VerifyDonationFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/donations/verify
+
+GetUploadUrlLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetUploadUrlFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/upload
+
+ScanQRLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref ScanQRFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/scan-qr
+
+UpdateProfileLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref UpdateProfileFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
+
+GetProfileLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetProfileFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
+
+DisburseFundsLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref DisburseFundsFunction
+    Principal: events.amazonaws.com
+    SourceArn: !GetAtt DisburseFundsSchedule.Arn
+
 Outputs:
-  APIEndpoint:
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}"
-  UserPoolId:
-    Value: !Ref UserPool
-  UserPoolClientId:
-    Value: !Ref UserPoolClient
-  StorageBucketName:
-    Value: !Ref StorageBucket
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for the selected stage
+    Value: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/

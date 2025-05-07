@@ -1,4 +1,5 @@
 name: Deploy
+
 on:
   push:
     branches: [aws]
@@ -6,36 +7,70 @@ on:
 env:
   AWS_REGION: eu-north-1
   ENVIRONMENT: dev
+  LAMBDA_CODE_BUCKET: ${{ secrets.LAMBDA_CODE_BUCKET }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: aws-actions/configure-aws-credentials@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install production dependencies
+        run: yarn install --production --frozen-lockfile
+
+      - name: Validate template.yaml
+        run: aws cloudformation validate-template --template-body file://template.yaml --region ${{ env.AWS_REGION }}
+
+      - name: Zip code and dependencies
+        run: |
+          mkdir -p deploy_package
+          cp -r ./* deploy_package/
+          cd deploy_package
+          zip -r ../code.zip . -x "*.git*" ".github/*" "test/*" "*.env*" "*.DS_Store" "node_modules/.bin/*"
+          cd ..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install production dependencies
-        run: yarn install --production --frozen-lockfile
-
-      - name: Zip code + dependencies
-        run: zip -r code.zip . -x "*.git*" ".github/*" "test/*" "*.env*"
-
       - name: Upload to S3
-        run: aws s3 cp code.zip s3://${{ secrets.LAMBDA_CODE_BUCKET }}/${{ env.ENVIRONMENT }}/code.zip
+        run: aws s3 cp code.zip s3://${{ env.LAMBDA_CODE_BUCKET }}/${{ env.ENVIRONMENT }}/code.zip
 
-      - name: Deploy
+      - name: Deploy CloudFormation Stack
         run: |
           aws cloudformation deploy \
             --template-file template.yaml \
             --stack-name meetro-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               EnvironmentName=${{ env.ENVIRONMENT }} \
-              LambdaCodeBucket=${{ secrets.LAMBDA_CODE_BUCKET }} \
+              LambdaCodeBucket=${{ env.LAMBDA_CODE_BUCKET }} \
               DomainName=${{ secrets.DOMAIN_NAME }} \
               GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }} \
-            --capabilities CAPABILITY_IAM
+              PAYSTACK_SECRET_KEY=${{ secrets.PAYSTACK_SECRET_KEY }} \
+              GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+              TWILIO_SID=${{ secrets.TWILIO_SID }} \
+              TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} \
+              TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} \
+              RESEND_API_KEY=${{ secrets.RESEND_API_KEY }} \
+              RESEND_FROM_EMAIL=${{ secrets.RESEND_FROM_EMAIL }} \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf deploy_package
+          rm -f code.zip
+
+      - name: Output Stack Status
+        run: aws cloudformation describe-stacks --stack-name meetro-${{ env.ENVIRONMENT }} --query 'Stacks[0].StackStatus' --output text --region ${{ env.AWS_REGION }}
