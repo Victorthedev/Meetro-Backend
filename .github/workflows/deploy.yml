@@ -35,6 +35,7 @@ jobs:
       - name: Zip code and dependencies
         run: |
           mkdir -p deploy_package
+          shopt -s extglob
           cp -r !(deploy_package) deploy_package/ || true
           cd deploy_package
           zip -r ../code.zip . -x "*.git*" ".github/*" "test/*" "*.env*" "*.DS_Store" "node_modules/.bin/*"
