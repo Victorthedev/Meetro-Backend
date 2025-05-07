@@ -8,41 +8,6 @@ Parameters:
       - dev
       - prod
     Description: Environment to deploy (dev or prod)
-  LambdaCodeBucket:
-    Type: String
-    Description: S3 bucket containing the Lambda code
-  DomainName:
-    Type: String
-    Description: Domain name for the API Gateway
-  GoogleClientId:
-    Type: String
-    Description: Google Client ID for OAuth
-  PaystackSecretKey:
-    Type: String
-    Description: Paystack secret key for payment processing
-    NoEcho: true
-  GoogleClientSecret:
-    Type: String
-    Description: Google client secret for OAuth
-    NoEcho: true
-  TwilioSid:
-    Type: String
-    Description: Twilio SID for SMS
-    NoEcho: true
-  TwilioAuthToken:
-    Type: String
-    Description: Twilio auth token
-    NoEcho: true
-  TwilioPhoneNumber:
-    Type: String
-    Description: Twilio phone number
-  ResendApiKey:
-    Type: String
-    Description: Resend API key for email
-    NoEcho: true
-  ResendFromEmail:
-    Type: String
-    Description: Resend from email address
 Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -57,6 +22,15 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
       Policies:
+        - PolicyName: ParameterStoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/meetro/dev/*
         - PolicyName: LambdaLogging
           PolicyDocument:
             Version: '2012-10-17'
@@ -727,7 +701,7 @@ Resources:
       Handler: signup.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -745,14 +719,14 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GoogleSignInFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -760,7 +734,7 @@ Resources:
       Handler: googleSignIn.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -778,14 +752,14 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   LoginFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -793,7 +767,7 @@ Resources:
       Handler: login.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -807,18 +781,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   LinkGoogleCalendarFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -826,7 +800,7 @@ Resources:
       Handler: linkGoogleCalendar.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -844,14 +818,14 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   CreateEventFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -859,7 +833,7 @@ Resources:
       Handler: createEvent.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -877,14 +851,14 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetEventFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -892,7 +866,7 @@ Resources:
       Handler: getEvent.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -910,14 +884,14 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetEventsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -925,7 +899,7 @@ Resources:
       Handler: getEvents.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -939,18 +913,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetMyEventsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -958,7 +932,7 @@ Resources:
       Handler: getMyEvents.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -972,18 +946,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetPublicEventsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -991,7 +965,7 @@ Resources:
       Handler: getPublicEvents.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1005,18 +979,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   UpdateStateFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1024,7 +998,7 @@ Resources:
       Handler: updateState.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1038,18 +1012,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   AddToCalendarFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1057,7 +1031,7 @@ Resources:
       Handler: addToCalendar.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1071,18 +1045,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   CreateTicketFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1090,7 +1064,7 @@ Resources:
       Handler: createTicket.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1104,18 +1078,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   PurchaseTicketFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1123,7 +1097,7 @@ Resources:
       Handler: purchaseTicket.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1137,18 +1111,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   VerifyPurchaseFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1156,7 +1130,7 @@ Resources:
       Handler: verifyPurchase.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1170,18 +1144,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetTicketSalesFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1189,7 +1163,7 @@ Resources:
       Handler: getTicketSales.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1203,18 +1177,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   CreateShareFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1222,7 +1196,7 @@ Resources:
       Handler: createShare.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1236,18 +1210,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   GetSharesFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1255,7 +1229,7 @@ Resources:
       Handler: getShares.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1269,18 +1243,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   ConfirmAttendanceFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1288,7 +1262,7 @@ Resources:
       Handler: confirmAttendance.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1302,18 +1276,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   CreateDonationFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1321,7 +1295,7 @@ Resources:
       Handler: createDonation.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1335,18 +1309,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   VerifyDonationFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1354,7 +1328,7 @@ Resources:
       Handler: verifyDonation.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1368,18 +1342,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   DisburseFundsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1387,7 +1361,7 @@ Resources:
       Handler: disburseFunds.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1401,18 +1375,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   DisburseFundsSchedule:
     Type: AWS::Events::Rule
     Properties:
@@ -1428,7 +1402,7 @@ Resources:
       Handler: getUploadUrl.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1442,18 +1416,18 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   ScanQRFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1461,7 +1435,7 @@ Resources:
       Handler: scanQR.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
         S3Key: !Sub ${EnvironmentName}/code.zip
       Runtime: nodejs20.x
       Timeout: 30
@@ -1475,259 +1449,105 @@ Resources:
           PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
           DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
           COGNITO_USER_POOL_ID: !Ref CognitoUserPool
           COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   UpdateProfileFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub Meetro-UpdateProfile-${EnvironmentName}
-      Handler: updateProfile.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub ${EnvironmentName}/code.zip
-      Runtime: nodejs20.x
-      Timeout: 30
-      MemorySize: 128
-      Environment:
-        Variables:
-          AWS_REGION: !Ref AWS::Region
-          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
-          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
-          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
-          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
-          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
-          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
-          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
-          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
-          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
-  GetProfileFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub Meetro-GetProfile-${EnvironmentName}
-      Handler: getProfile.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: !Sub ${EnvironmentName}/code.zip
-      Runtime: nodejs20.x
-      Timeout: 30
-      MemorySize: 128
-      Environment:
-        Variables:
-          AWS_REGION: !Ref AWS::Region
-          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
-          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
-          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
-          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
-          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
-          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-          UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
-          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
-          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
-          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-          PAYSTACK_SECRET_KEY: !Ref PaystackSecretKey
-          GOOGLE_CLIENT_ID: !Ref GoogleClientId
-          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
-          TWILIO_SID: !Ref TwilioSid
-          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
-          RESEND_API_KEY: !Ref ResendApiKey
-          RESEND_FROM_EMAIL: !Ref ResendFromEmail
-  SignupLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref SignupFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/signup
-  GoogleSignInLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GoogleSignInFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/google-signin
-  LoginLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LoginFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/login
-  LinkGoogleCalendarLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LinkGoogleCalendarFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/link-google-calendar
-  CreateEventLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CreateEventFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/events
-  GetEventsLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetEventsFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/events
-  GetEventLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetEventFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/events/{eventId}
-  UpdateStateLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref UpdateStateFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/events/{eventId}/state
-  AddToCalendarLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref AddToCalendarFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/events/{eventId}/add-to-calendar
-  GetMyEventsLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetMyEventsFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/my-events
-  GetPublicEventsLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetPublicEventsFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/public-events
-  CreateTicketLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CreateTicketFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/tickets
-  PurchaseTicketLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref PurchaseTicketFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/tickets/purchase
-  VerifyPurchaseLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref VerifyPurchaseFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/tickets/verify
-  GetTicketSalesLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetTicketSalesFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/tickets/sales/{eventId}
-  CreateShareLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CreateShareFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/shares
-  GetSharesLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetSharesFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/shares
-  ConfirmAttendanceLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref ConfirmAttendanceFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/shares/{shareId}/confirm
-  CreateDonationLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CreateDonationFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/donations
-  VerifyDonationLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref VerifyDonationFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/donations/verify
-  GetUploadUrlLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetUploadUrlFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/upload
-  ScanQRLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref ScanQRFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/scan-qr
-  UpdateProfileLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref UpdateProfileFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
-  GetProfileLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GetProfileFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
-  DisburseFundsLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref DisburseFundsFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt DisburseFundsSchedule.Arn
+  Type: AWS::Lambda::Function
+  Properties:
+    FunctionName: !Sub Meetro-UpdateProfile-${EnvironmentName}
+    Handler: updateProfile.handler
+    Role: !GetAtt LambdaExecutionRole.Arn
+    Code:
+      S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+      S3Key: !Sub ${EnvironmentName}/code.zip
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 128
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+        USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+        EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+        TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+        PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+        DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+        SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+        UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+        PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+        GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+        GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+        TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+        TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+        TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+        RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+        RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+GetProfileFunction:
+  Type: AWS::Lambda::Function
+  Properties:
+    FunctionName: !Sub Meetro-GetProfile-${EnvironmentName}
+    Handler: getProfile.handler
+    Role: !GetAtt LambdaExecutionRole.Arn
+    Code:
+      S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+      S3Key: !Sub ${EnvironmentName}/code.zip
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 128
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+        USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+        EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+        TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+        PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+        DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+        SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+        UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+        PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+        GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+        GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+        TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+        TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+        TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+        RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+        RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+UpdateProfileLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref UpdateProfileFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
+GetProfileLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GetProfileFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
+DisburseFundsLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref DisburseFundsFunction
+    Principal: events.amazonaws.com
+    SourceArn: !GetAtt DisburseFundsSchedule.Arn
 Outputs:
   ApiGatewayUrl:
     Description: URL of the API Gateway
