@@ -755,36 +755,36 @@ Resources:
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetProfileFunction.Arn}/invocations
 
   # API Gateway Deployment
-  ApiGatewayDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - SignupMethod
-      - GoogleSignInMethod
-      - LoginMethod
-      - LinkGoogleCalendarMethod
-      - CreateEventMethod
-      - GetEventsMethod
-      - GetEventMethod
-      - UpdateStateMethod
-      - AddToCalendarMethod
-      - GetMyEventsMethod
-      - GetPublicEventsMethod
-      - CreateTicketMethod
-      - PurchaseTicketMethod
-      - VerifyPurchaseMethod
-      - GetTicketSalesMethod
-      - CreateShareMethod
-      - GetSharesMethod
-      - ConfirmAttendanceMethod
-      - CreateDonationMethod
-      - VerifyDonationMethod
-      - GetUploadUrlMethod
-      - ScanQRMethod
-      - UpdateProfileMethod
-      - GetProfileMethod
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      StageName: !Ref EnvironmentName
+ApiGatewayDeployment:
+  Type: AWS::ApiGateway::Deployment
+  DependsOn:
+    - SignupMethod
+    - GoogleSignInMethod
+    - LoginMethod
+    - LinkGoogleCalendarMethod
+    - CreateEventMethod
+    - GetEventsMethod
+    - GetEventMethod
+    - UpdateStateMethod
+    - AddToCalendarMethod
+    - GetMyEventsMethod
+    - GetPublicEventsMethod
+    - CreateTicketMethod
+    - PurchaseTicketMethod
+    - VerifyPurchaseMethod
+    - GetTicketSalesMethod
+    - CreateShareMethod
+    - GetSharesMethod
+    - ConfirmAttendanceMethod
+    - CreateDonationMethod
+    - VerifyDonationMethod
+    - GetUploadUrlMethod
+    - ScanQRMethod
+    - UpdateProfileMethod
+    - GetProfileMethod
+  Properties:
+    RestApiId: !Ref ApiGatewayRestApi
+    StageName: !Ref EnvironmentName
 
   # Lambda Functions (Auth)
   SignupFunction:
@@ -1652,21 +1652,21 @@ Resources:
           RESEND_FROM_EMAIL: !Sub ${RESEND_FROM_EMAIL}
 
   # Lambda Permissions for API Gateway
-  SignupLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref SignupFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/signup
+SignupLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref SignupFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/signup
 
-  GoogleSignInLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref GoogleSignInFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/google-signin
+GoogleSignInLambdaPermission:
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref GoogleSignInFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/google-signin
 
   LoginLambdaPermission:
     Type: AWS::Lambda::Permission
