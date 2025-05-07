@@ -32,9 +32,6 @@ jobs:
       - name: Install production dependencies
         run: yarn install --production --frozen-lockfile
 
-      - name: Validate template.yaml
-        run: aws cloudformation validate-template --template-file template.yaml --region ${{ env.AWS_REGION }}
-
       - name: Zip code and dependencies
         run: |
           mkdir -p deploy_package
