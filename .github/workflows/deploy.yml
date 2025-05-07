@@ -33,7 +33,7 @@ jobs:
         run: yarn install --production --frozen-lockfile
 
       - name: Validate template.yaml
-        run: aws cloudformation validate-template --template-body file://$(pwd)/template.yaml --region ${{ env.AWS_REGION }}
+        run: aws cloudformation validate-template --template-body template.yaml --region ${{ env.AWS_REGION }}
 
       - name: Zip code and dependencies
         run: |
