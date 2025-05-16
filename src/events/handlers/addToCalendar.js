@@ -3,9 +3,10 @@ const { TABLE_NAMES, API_KEYS } = require('../../utils/constants');
 const { google } = require('googleapis');
 const logger = require('../../utils/logger');
 const axios = require('axios');
-const ical = require('ical-generator'); // Requires npm install ical-generator
+const ical = require('ical-generator');
+const { decode } = require('jsonwebtoken');
 
-const oauth2Client = new google.auth.OOAuth2(
+const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   'postmessage'
@@ -13,20 +14,57 @@ const oauth2Client = new google.auth.OOAuth2(
 
 exports.handler = async (event) => {
   try {
+    // Parse input with multiple fallbacks
+    const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
     const { eventId } = event.pathParameters || {};
+
+    // Validate required fields
     if (!eventId) {
-      logger.error('Missing eventId');
+      console.error('Missing eventId');
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Missing eventId' }),
       };
     }
 
-    const userId = event.requestContext.authorizer.jwt.claims.sub;
+    // Multi-format JWT extraction
+    let userId;
+    const authContext = event.requestContext?.authorizer;
+
+    // Case 1: Standard API Gateway with Cognito
+    if (authContext?.jwt?.claims?.sub) {
+      userId = authContext.jwt.claims.sub;
+    }
+    // Case 2: Proxy integration format
+    else if (authContext?.claims?.sub) {
+      userId = authContext.claims.sub;
+    }
+    // Case 3: Fallback to Authorization header
+    else if (event.headers?.Authorization) {
+      const token = event.headers.Authorization.split(' ')[1];
+      const decoded = decode(token);
+      userId = decoded?.sub;
+    }
+
+    // Handle JWT-as-ID case
+    if (userId && userId.startsWith('eyJ')) {
+      const decoded = decode(userId);
+      userId = decoded?.sub;
+    }
+
+    if (!userId) {
+      console.error('Missing user ID in event:', JSON.stringify(event, null, 2));
+      return {
+        statusCode: 401,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid user identity' }),
+      };
+    }
+
     const user = await getItem(TABLE_NAMES.USERS, { userId: { S: userId } });
 
     if (!user) {
-      logger.error('User not found', { userId });
+      console.error('User not found', { userId });
       return {
         statusCode: 404,
         body: JSON.stringify({ error: 'User not found' }),
@@ -35,7 +73,7 @@ exports.handler = async (event) => {
 
     const eventData = await getItem(TABLE_NAMES.EVENTS, { id: { S: eventId } });
     if (!eventData) {
-      logger.error('Event not found', { eventId });
+      console.error('Event not found', { eventId });
       return {
         statusCode: 404,
         body: JSON.stringify({ error: 'Event not found' }),
@@ -56,16 +94,16 @@ exports.handler = async (event) => {
           end: { dateTime: new Date(new Date(eventData.date.S).getTime() + 2 * 60 * 60 * 1000).toISOString() }, // 2-hour default
         },
       });
-      logger.info('Event added to Google Calendar', { userId, eventId });
+      console.log('Event added to Google Calendar', { userId, eventId });
     } else {
       // Google Calendar not linked, send ICS file via email
       const calendar = ical({ name: 'Meetro Event' });
-      calendar.addEvent({
+      calendar.createEvent({
         start: new Date(eventData.date.S),
         end: new Date(new Date(eventData.date.S).getTime() + 2 * 60 * 60 * 1000),
         summary: eventData.title.S,
         description: eventData.description.S,
-        url: `https://meetro.live/events/${eventId}`, // Replace with actual domain
+        url: `https://meetro.live/events/${eventId}`,
       });
 
       const icsContent = calendar.toString();
@@ -88,16 +126,16 @@ exports.handler = async (event) => {
           headers: { Authorization: `Bearer ${API_KEYS.RESEND_API_KEY}` },
         }
       );
-      logger.info('ICS file sent to email', { userId, eventId, email: user.email.S });
+      console.log('ICS file sent to email', { userId, eventId, email: user.email.S });
     }
 
-    logger.info('Event added to calendar or emailed', { userId, eventId });
+    console.log('Event added to calendar or emailed', { userId, eventId });
     return {
       statusCode: 200,
       body: JSON.stringify({ message: 'Event added to calendar or emailed' }),
     };
   } catch (error) {
-    logger.error('Add to calendar error', { error: error.message, stack: error.stack });
+    console.error('Add to calendar error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),

@@ -1,5 +1,6 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
+const { PutCommand, GetItemCommand, UpdateItemCommand, QueryCommand, ScanCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(client);
@@ -7,7 +8,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 const getClient = () => docClient;
 
 const putItem = async (tableName, item) => {
-  const command = new PutItemCommand({
+  const command = new PutCommand({
     TableName: tableName,
     Item: item,
   });
@@ -41,15 +42,72 @@ const scanItems = async (tableName, params) => {
   return result.Items;
 };
 
-const updateItem = async (tableName, key, updateExpression, expressionAttributeValues) => {
+const updateItem = async (tableName, key, updateExpression, expressionAttributeValues, expressionAttributeNames) => {
   const command = new UpdateItemCommand({
     TableName: tableName,
     Key: key,
     UpdateExpression: updateExpression,
     ExpressionAttributeValues: expressionAttributeValues,
-    ReturnValues: 'ALL_NEW',
+    ExpressionAttributeNames: expressionAttributeNames,
+    ReturnValues: 'ALL_NEW'
   });
   return getClient().send(command);
 };
 
-module.exports = { putItem, getItem, queryItems, scanItems, updateItem };
+const deleteItem = async (tableName, key) => {
+  const command = new DeleteItemCommand({
+    TableName: tableName,
+    Key: key,
+  });
+  return getClient().send(command);
+};
+
+const upsertUser = async (tableName, userId, userData) => {
+  const updateParts = [];
+  const attrValues = {};
+  const attrNames = {
+    '#updatedAt': 'updatedAt'
+  };
+
+  Object.entries(userData).forEach(([key, value]) => {
+    updateParts.push(`#${key} = :${key}`);
+    attrValues[`:${key}`] = value;
+    attrNames[`#${key}`] = key;
+  });
+
+  attrValues[':updatedAt'] = { S: new Date().toISOString() };
+
+  try {
+    return await updateItem(
+      tableName,
+      { userId: { S: userId } },
+      `SET ${updateParts.join(', ')}, #updatedAt = :updatedAt`,
+      attrValues,
+      attrNames
+    );
+  } catch (error) {
+    if (error.name === 'ValidationException') {
+      await getClient().send(new PutCommand({
+        TableName: tableName,
+        Item: {
+          userId: { S: userId },
+          ...userData,
+          createdAt: { S: new Date().toISOString() },
+          updatedAt: { S: new Date().toISOString() }
+        }
+      }));
+    } else {
+      throw error;
+    }
+  }
+};
+
+module.exports = { 
+  putItem,
+  getItem,
+  queryItems,
+  scanItems,
+  updateItem,
+  deleteItem,
+  upsertUser
+};

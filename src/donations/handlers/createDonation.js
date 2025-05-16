@@ -1,4 +1,4 @@
-const { putItem } = require('../../utils/db');
+const { putItem, getItem } = require('../../utils/db');
 const { TABLE_NAMES } = require('../../utils/constants');
 const axios = require('axios');
 const logger = require('../../utils/logger');
@@ -13,6 +13,41 @@ exports.handler = async (event) => {
         statusCode: 400,
         body: JSON.stringify({ error: 'Missing required fields' }),
       };
+    }
+
+    // Get event details
+    const event = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
+    if (!event) {
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: 'Event not found' })
+      };
+    }
+
+    // Validate chip-in amount if event has chip-in
+    if (event.chipInAmount) {
+      const parsedAmount = parseFloat(amount);
+      
+      if (event.chipInType === 'FIXED') {
+        if (parsedAmount !== parseFloat(event.chipInSettings.fixedAmount)) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ 
+              error: `This event requires exactly ₦${event.chipInSettings.fixedAmount}` 
+            })
+          };
+        }
+      }
+      else if (event.chipInType === 'FLEXIBLE') {
+        if (parsedAmount < parseFloat(event.chipInSettings.minAmount)) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ 
+              error: `Minimum chip-in amount is ₦${event.chipInSettings.minAmount}` 
+            })
+          };
+        }
+      }
     }
 
     const userId = event.requestContext.authorizer.jwt.claims.sub;
@@ -35,7 +70,7 @@ exports.handler = async (event) => {
       id: donationId,
       userId,
       eventId,
-      amount: parseFloat(amount).toString(),
+      amount: amount.toString(),
       paymentReference,
       status: 'pending',
       createdAt: new Date().toISOString(),

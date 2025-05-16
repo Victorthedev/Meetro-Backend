@@ -222,8 +222,20 @@ Resources:
     Properties:
       IdentityPoolName: !Sub MeetroIdentityPool-${EnvironmentName}
       AllowUnauthenticatedIdentities: false
-      CognitoUserPools:
-        - !Ref CognitoUserPool
+      CognitoIdentityProviders:
+       - ClientId: !Ref CognitoUserPoolClient
+         ProviderName: !Sub cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}
+  CognitoIdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoIdentityPool
+      Roles:
+        authenticated: !GetAtt LambdaExecutionRole.Arn
+      RoleMappings:
+        cognito:
+          Type: Token
+          AmbiguousRoleResolution: AuthenticatedRole
+          IdentityProvider: !Sub cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}:${CognitoUserPoolClient}
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -708,7 +720,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -741,7 +752,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -774,7 +784,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -807,7 +816,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -840,7 +848,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -873,7 +880,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -906,7 +912,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -939,7 +944,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -972,7 +976,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1005,7 +1008,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1038,7 +1040,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1071,7 +1072,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1104,7 +1104,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1137,7 +1136,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1170,7 +1168,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1203,7 +1200,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1236,7 +1232,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1269,7 +1264,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1302,7 +1296,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1335,7 +1328,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1368,7 +1360,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1409,7 +1400,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1442,7 +1432,6 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
           EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
           TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
@@ -1462,100 +1451,128 @@ Resources:
           RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
           RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
   UpdateProfileFunction:
-  Type: AWS::Lambda::Function
-  Properties:
-    FunctionName: !Sub Meetro-UpdateProfile-${EnvironmentName}
-    Handler: updateProfile.handler
-    Role: !GetAtt LambdaExecutionRole.Arn
-    Code:
-      S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
-      S3Key: !Sub ${EnvironmentName}/code.zip
-    Runtime: nodejs20.x
-    Timeout: 30
-    MemorySize: 128
-    Environment:
-      Variables:
-        AWS_REGION: !Ref AWS::Region
-        USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
-        EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
-        TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
-        PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
-        DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
-        SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-        UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
-        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
-        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
-        COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-        PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
-        GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
-        GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
-        TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
-        TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
-        TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
-        RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
-        RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
-GetProfileFunction:
-  Type: AWS::Lambda::Function
-  Properties:
-    FunctionName: !Sub Meetro-GetProfile-${EnvironmentName}
-    Handler: getProfile.handler
-    Role: !GetAtt LambdaExecutionRole.Arn
-    Code:
-      S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
-      S3Key: !Sub ${EnvironmentName}/code.zip
-    Runtime: nodejs20.x
-    Timeout: 30
-    MemorySize: 128
-    Environment:
-      Variables:
-        AWS_REGION: !Ref AWS::Region
-        USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
-        EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
-        TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
-        PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
-        DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
-        SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
-        UPLOAD_BUCKET: !Sub meetro-Uploads-${AWS::AccountId}-${EnvironmentName}
-        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
-        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
-        COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
-        PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
-        GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
-        GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
-        TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
-        TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
-        TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
-        RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
-        RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
-UpdateProfileLambdaPermission:
-  Type: AWS::Lambda::Permission
-  Properties:
-    Action: lambda:InvokeFunction
-    FunctionName: !Ref UpdateProfileFunction
-    Principal: apigateway.amazonaws.com
-    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
-GetProfileLambdaPermission:
-  Type: AWS::Lambda::Permission
-  Properties:
-    Action: lambda:InvokeFunction
-    FunctionName: !Ref GetProfileFunction
-    Principal: apigateway.amazonaws.com
-    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
-DisburseFundsLambdaPermission:
-  Type: AWS::Lambda::Permission
-  Properties:
-    Action: lambda:InvokeFunction
-    FunctionName: !Ref DisburseFundsFunction
-    Principal: events.amazonaws.com
-    SourceArn: !GetAtt DisburseFundsSchedule.Arn
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-UpdateProfile-${EnvironmentName}
+      Handler: updateProfile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+  GetProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-GetProfile-${EnvironmentName}
+      Handler: getProfile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+  ScanQRLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ScanQRFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/scan-qr
+  UpdateProfileLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UpdateProfileFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
+  GetProfileLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetProfileFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - SignupMethod
+      - GoogleSignInMethod
+      - LoginMethod
+      - LinkGoogleCalendarMethod
+      - CreateEventMethod
+      - GetEventsMethod
+      - GetEventMethod
+      - UpdateStateMethod
+      - AddToCalendarMethod
+      - GetMyEventsMethod
+      - GetPublicEventsMethod
+      - CreateTicketMethod
+      - PurchaseTicketMethod
+      - VerifyPurchaseMethod
+      - GetTicketSalesMethod
+      - CreateShareMethod
+      - GetSharesMethod
+      - ConfirmAttendanceMethod
+      - CreateDonationMethod
+      - VerifyDonationMethod
+      - GetUploadUrlMethod
+      - ScanQRMethod
+      - UpdateProfileMethod
+      - GetProfileMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: !Ref EnvironmentName
 Outputs:
-  ApiGatewayUrl:
-    Description: URL of the API Gateway
+  ApiGatewayEndpoint:
+    Description: Endpoint URL for the Meetro API
     Value: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}
   CognitoUserPoolId:
     Description: ID of the Cognito User Pool
     Value: !Ref CognitoUserPool
-  CognitoUserPoolClientId:
+  CognitoClientId:
     Description: ID of the Cognito User Pool Client
     Value: !Ref CognitoUserPoolClient
   CognitoIdentityPoolId:
@@ -1564,21 +1581,3 @@ Outputs:
   UploadBucketName:
     Description: Name of the S3 bucket for uploads
     Value: !Ref UploadBucket
-  UsersTableName:
-    Description: Name of the DynamoDB Users table
-    Value: !Ref MeetroUsersTable
-  EventsTableName:
-    Description: Name of the DynamoDB Events table
-    Value: !Ref MeetroEventsTable
-  TicketsTableName:
-    Description: Name of the DynamoDB Tickets table
-    Value: !Ref MeetroTicketsTable
-  PurchasesTableName:
-    Description: Name of the DynamoDB Purchases table
-    Value: !Ref MeetroPurchasesTable
-  DonationsTableName:
-    Description: Name of the DynamoDB Donations table
-    Value: !Ref MeetroDonationsTable
-  SharesTableName:
-    Description: Name of the DynamoDB Shares table
-    Value: !Ref MeetroSharesTable
