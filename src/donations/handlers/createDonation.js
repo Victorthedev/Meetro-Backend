@@ -6,9 +6,9 @@ const { v4: uuidv4 } = require('uuid');
 
 exports.handler = async (event) => {
   try {
-    const { eventId, amount } = JSON.parse(event.body || '{}');
-    if (!eventId || !amount) {
-      logger.error('Missing required fields', { fields: { eventId, amount } });
+    const { eventId, amount, userEmail } = JSON.parse(event.body || '{}');
+    if (!eventId || !amount || !userEmail) {
+      console.error('Missing required fields', { fields: { eventId, amount, userEmail } });
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Missing required fields' }),
@@ -17,10 +17,10 @@ exports.handler = async (event) => {
 
     // Get event details
     const event = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
-    if (!event) {
+    if (!event || !event.chipInDetails) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Event not found' })
+        body: JSON.stringify({ error: 'Event not found or not accepting chip-ins' })
       };
     }
 
@@ -51,45 +51,52 @@ exports.handler = async (event) => {
     }
 
     const userId = event.requestContext.authorizer.jwt.claims.sub;
-    const donationId = uuidv4();
+    const chipInId = `CHIPIN_${uuidv4()}`;
     const paymentReference = uuidv4();
 
-    const paystackResponse = await axios.post(
+    const paymentResponse = await axios.post(
       'https://api.paystack.co/transaction/initialize',
       {
-        email: userId, // Placeholder; replace with actual email if needed
-        amount: parseFloat(amount) * 100,
-        reference: paymentReference,
+        email: userEmail,
+        amount: parsedAmount * 100, // Convert to kobo
+        reference: `CHIPIN_${uuidv4()}`,
+        metadata: {
+          eventId,
+          chipInType: 'event',
+          recipientCode: event.chipInDetails.recipientCode
+        }
       },
       {
-        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
       }
     );
 
     await putItem(TABLE_NAMES.DONATIONS, {
-      id: donationId,
-      userId,
+      id: chipInId,
       eventId,
-      amount: amount.toString(),
-      paymentReference,
+      userId: userId,
+      userEmail: userEmail,
+      amount: parsedAmount.toString(),
       status: 'pending',
-      createdAt: new Date().toISOString(),
+      paymentReference: paymentResponse.data.data.reference,
+      recipientCode: event.chipInDetails.recipientCode,
+      createdAt: new Date().toISOString()
     });
 
-    logger.info('Donation initiated', { donationId, userId, eventId });
+    console.log('Donation initiated', { donationId, userId, eventId });
     return {
       statusCode: 200,
       body: JSON.stringify({
         donationId,
         paymentUrl: paystackResponse.data.data.authorization_url,
-        message: 'Donation initiated',
+        message: 'Payment initiated',
       }),
     };
   } catch (error) {
-    logger.error('Create donation error', { error: error.message, stack: error.stack });
+    console.error('Create donation error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      body: JSON.stringify({ error: 'Payment initialization failed' }),
     };
   }
 };

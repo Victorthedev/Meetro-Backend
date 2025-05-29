@@ -42,7 +42,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Rest of your update logic...
     const userData = {};
     if (firstName) userData.firstName = { S: firstName };
     if (lastName) userData.lastName = { S: lastName };

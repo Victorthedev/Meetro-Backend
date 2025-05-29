@@ -1,11 +1,12 @@
 const { putItem } = require('../../utils/db');
+const { finalizeEventImage } = require('../../utils/upload');
 const { TABLE_NAMES, EVENT_CATEGORIES } = require('../../utils/constants');
 const { v4: uuidv4 } = require('uuid');
 const { decode } = require('jsonwebtoken');
+import verifyBankDetails from '../../utils/accountVerification';
 
 exports.handler = async (event) => {
   try {
-    // Parse input - ADD chipInType AND chipInSettings TO DESTRUCTURING
     const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
     const { 
       title, 
@@ -15,13 +16,14 @@ exports.handler = async (event) => {
       ticketTypes, 
       isPrivate, 
       chipInAmount, 
-      chipInType,       // Added this
-      chipInSettings,   // Added this
+      chipInType,
+      chipInSettings,
       category = '', 
-      imageKey 
+      imageKey,
+      tempImageKey,
+      dressCode 
     } = body;
 
-    // Multi-format JWT extraction
     let userId;
     const authContext = event.requestContext?.authorizer;
     
@@ -50,7 +52,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Validation checks (unchanged except for chipIn validation)
     if (!title || !date) {
       return {
         statusCode: 400,
@@ -72,14 +73,18 @@ exports.handler = async (event) => {
       };
     }
 
-    if (imageKey && !imageKey.startsWith('events/')) {
+    let finalImageKey = imageKey;
+    if (tempImageKey && tempImageKey.startsWith('events/temp/')) {
+      finalImageKey = await finalizeEventImage(tempImageKey, `${isPrivate ? 'PRI' : 'PUB'}_${uuidv4()}`);
+    }
+
+    if (finalImageKey && !finalImageKey.startsWith('events/')) {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Image key must start with "events/"' })
       };
     }
 
-    // FIXED: Now properly checking defined variables
     if (chipInAmount) {
       if (!chipInType || !['FIXED', 'FLEXIBLE'].includes(chipInType)) {
         return { 
@@ -101,12 +106,49 @@ exports.handler = async (event) => {
           body: JSON.stringify({ error: 'Min amount required for FLEXIBLE type' }) 
         };
       }
+
+      // NEW: Validate bank details when chip-in is used
+      const { bankDetails } = body;
+      if (!bankDetails || !bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.accountName) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: 'Bank details (bankName, accountNumber, accountName) are required when using chip-in' })
+        };
+      }
     }
 
-    // Create event
+    const bankVerification = await verifyBankDetails(
+      bankDetails.accountNumber,
+      bankDetails.bankCode
+    );
+
+    if (!bankVerification.isValid) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Bank account verification failed: ' + bankVerification.error })
+      };
+    }
+
+    const recipientResponse = await axios.post(
+      'https://api.paystack.co/transferrecipient',
+      {
+        type: 'nuban',
+        name: bankVerification.accountName,
+        account_number: bankVerification.accountNumber,
+        bank_code: bankVerification.bankCode,
+        currency: 'NGN'
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
     const eventId = `${isPrivate ? 'PRI' : 'PUB'}_${uuidv4()}`;
     
-    await putItem(TABLE_NAMES.EVENTS, {
+    const eventData = {
       id: eventId,
       creator: userId,
       title,
@@ -120,20 +162,31 @@ exports.handler = async (event) => {
       },
       ticketTypes: isPrivate ? [] : (ticketTypes || []),
       isPrivate: isPrivate ? 'true' : 'false',
-      ...(chipInAmount && { 
-        chipInAmount: parseFloat(chipInAmount),
-        chipInType,
-        chipInSettings
-      }),
       createdAt: new Date().toISOString(),
       ...(category && { category }),
-      ...(imageKey && { imageKey })
-    });
+      ...(finalImageKey && { imageKey: finalImageKey }),
+      ...(dressCode && { dressCode }),
+    };
+
+    if (chipInAmount) {
+      eventData.chipInAmount = chipInAmount;
+      eventData.chipInType = chipInType;
+      eventData.chipInSettings = chipInSettings;
+      eventData.recipientCode = recipientResponse.data.data.recipient_code;
+      eventData.bankDetails = {
+        bankName: body.bankDetails.bankName,
+        accountNumber: body.bankDetails.accountNumber,
+        accountName: body.bankDetails.accountName
+      };
+    }
+
+    await putItem(TABLE_NAMES.EVENTS, eventData);
 
     return {
       statusCode: 200,
       body: JSON.stringify({ 
         eventId,
+        ...(finalImageKey && { imageKey: finalImageKey }),
         message: 'Event created successfully'
       })
     };

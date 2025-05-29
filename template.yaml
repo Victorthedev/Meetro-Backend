@@ -610,6 +610,24 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VerifyDonationFunction.Arn}/invocations
+  PaystackWebhookResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: paystack-webhook
+
+  PaystackWebhookMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref PaystackWebhookResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PaystackWebhookFunction.Arn}/invocations
   UploadResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -1346,6 +1364,28 @@ Resources:
           TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
           RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
           RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+  PaystackWebhookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-PaystackWebhook-${EnvironmentName}
+      Handler: paystackWebhook.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          PAYSTACK_SECRET_KEY: 'sk_test_1c2097d1d4fc512843fc5920562ef4ad8b05eb6b'
   DisburseFundsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1535,6 +1575,13 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/profile
+  PaystackWebhookLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PaystackWebhookFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/paystack-webhook
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -1558,6 +1605,7 @@ Resources:
       - ConfirmAttendanceMethod
       - CreateDonationMethod
       - VerifyDonationMethod
+      - PaystackWebhookMethod
       - GetUploadUrlMethod
       - ScanQRMethod
       - UpdateProfileMethod

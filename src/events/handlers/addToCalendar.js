@@ -1,9 +1,8 @@
 const { getItem } = require('../../utils/db');
 const { TABLE_NAMES, API_KEYS } = require('../../utils/constants');
 const { google } = require('googleapis');
-const logger = require('../../utils/logger');
 const axios = require('axios');
-const ical = require('ical-generator');
+const icalGenerator = require('ical-generator');  // Fixed: proper import variable name
 const { decode } = require('jsonwebtoken');
 
 const oauth2Client = new google.auth.OAuth2(
@@ -97,7 +96,11 @@ exports.handler = async (event) => {
       console.log('Event added to Google Calendar', { userId, eventId });
     } else {
       // Google Calendar not linked, send ICS file via email
-      const calendar = ical({ name: 'Meetro Event' });
+      // Fixed: proper initialization of ical-generator
+      const calendar = icalGenerator.default({ name: 'Meetro Event' });
+      // If the above doesn't work, try this alternative:
+      // const calendar = new icalGenerator({ name: 'Meetro Event' });
+      
       calendar.createEvent({
         start: new Date(eventData.date.S),
         end: new Date(new Date(eventData.date.S).getTime() + 2 * 60 * 60 * 1000),
