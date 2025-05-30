@@ -1,6 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
-const { PutCommand, GetItemCommand, UpdateItemCommand, QueryCommand, ScanCommand, DeleteItemCommand } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(client);
@@ -16,7 +15,7 @@ const putItem = async (tableName, item) => {
 };
 
 const getItem = async (tableName, key) => {
-  const command = new GetItemCommand({
+  const command = new GetCommand({
     TableName: tableName,
     Key: key,
   });
@@ -43,7 +42,7 @@ const scanItems = async (tableName, params) => {
 };
 
 const updateItem = async (tableName, key, updateExpression, expressionAttributeValues, expressionAttributeNames) => {
-  const command = new UpdateItemCommand({
+  const command = new UpdateCommand({
     TableName: tableName,
     Key: key,
     UpdateExpression: updateExpression,
@@ -55,7 +54,7 @@ const updateItem = async (tableName, key, updateExpression, expressionAttributeV
 };
 
 const deleteItem = async (tableName, key) => {
-  const command = new DeleteItemCommand({
+  const command = new DeleteCommand({
     TableName: tableName,
     Key: key,
   });
@@ -75,12 +74,12 @@ const upsertUser = async (tableName, userId, userData) => {
     attrNames[`#${key}`] = key;
   });
 
-  attrValues[':updatedAt'] = { S: new Date().toISOString() };
+  attrValues[':updatedAt'] = new Date().toISOString();
 
   try {
     return await updateItem(
       tableName,
-      { userId: { S: userId } },
+      { userId },
       `SET ${updateParts.join(', ')}, #updatedAt = :updatedAt`,
       attrValues,
       attrNames
@@ -90,10 +89,10 @@ const upsertUser = async (tableName, userId, userData) => {
       await getClient().send(new PutCommand({
         TableName: tableName,
         Item: {
-          userId: { S: userId },
+          userId,
           ...userData,
-          createdAt: { S: new Date().toISOString() },
-          updatedAt: { S: new Date().toISOString() }
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         }
       }));
     } else {

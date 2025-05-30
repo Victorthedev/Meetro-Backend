@@ -26,4 +26,4 @@ async function verifyBankDetails(accountNumber, bankCode) {
   }
 }
 
-export default verifyBankDetails;
+module.exports = verifyBankDetails;

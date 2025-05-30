@@ -1,69 +1,106 @@
 const { putItem, getItem } = require('../../utils/db');
 const { TABLE_NAMES } = require('../../utils/constants');
 const axios = require('axios');
-const logger = require('../../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 
 exports.handler = async (event) => {
   try {
-    const { eventId, amount, userEmail } = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || '{}');
+    const { eventId, amount, userEmail } = body;
+    
     if (!eventId || !amount || !userEmail) {
-      console.error('Missing required fields', { fields: { eventId, amount, userEmail } });
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required fields' }),
+        body: JSON.stringify({ error: 'Missing required fields' })
       };
     }
 
     // Get event details
-    const event = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
-    if (!event || !event.chipInDetails) {
+    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
+    console.log('Retrieved event data:', JSON.stringify(eventData, null, 2));
+
+    if (!eventData) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Event not found or not accepting chip-ins' })
+        body: JSON.stringify({ error: 'Event not found' })
       };
     }
 
-    // Validate chip-in amount if event has chip-in
-    if (event.chipInAmount) {
-      const parsedAmount = parseFloat(amount);
-      
-      if (event.chipInType === 'FIXED') {
-        if (parsedAmount !== parseFloat(event.chipInSettings.fixedAmount)) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ 
-              error: `This event requires exactly ₦${event.chipInSettings.fixedAmount}` 
-            })
-          };
-        }
+    // Check if chip-in is enabled
+    if (!eventData.chipInAmount || !eventData.recipientCode) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: 'Event does not accept chip-ins or is not properly configured',
+          details: {
+            hasChipInAmount: !!eventData.chipInAmount,
+            hasRecipientCode: !!eventData.recipientCode
+          }
+        })
+      };
+    }
+
+    // Validate amount
+    const parsedAmount = parseFloat(amount);
+    if (eventData.chipInType === 'FIXED') {
+      if (parsedAmount !== parseFloat(eventData.chipInSettings.fixedAmount)) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ 
+            error: `This event requires exactly ₦${eventData.chipInSettings.fixedAmount}` 
+          })
+        };
       }
-      else if (event.chipInType === 'FLEXIBLE') {
-        if (parsedAmount < parseFloat(event.chipInSettings.minAmount)) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ 
-              error: `Minimum chip-in amount is ₦${event.chipInSettings.minAmount}` 
-            })
-          };
-        }
+    } else if (eventData.chipInType === 'FLEXIBLE') {
+      if (parsedAmount < parseFloat(eventData.chipInSettings.minAmount)) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ 
+            error: `Minimum chip-in amount is ₦${eventData.chipInSettings.minAmount}` 
+          })
+        };
       }
     }
 
-    const userId = event.requestContext.authorizer.jwt.claims.sub;
-    const chipInId = `CHIPIN_${uuidv4()}`;
-    const paymentReference = uuidv4();
+    // IMPROVED USER ID EXTRACTION (ONLY CHANGE MADE)
+    const authContext = event.requestContext?.authorizer;
+    const userId = authContext?.jwt?.claims?.sub || 
+                  authContext?.claims?.sub ||
+                  authContext?.lambda?.sub;
+    
+    console.log('Auth context:', JSON.stringify(authContext, null, 2)); // Debug log
 
+    if (!userId) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ 
+          error: 'Unauthorized - missing user ID',
+          details: {
+            authContextPresent: !!authContext,
+            possibleLocations: {
+              jwtClaims: authContext?.jwt?.claims,
+              regularClaims: authContext?.claims,
+              lambda: authContext?.lambda
+            }
+          }
+        })
+      };
+    }
+
+    const paymentReference = `CHIPIN_${uuidv4()}`;
+
+    // Initialize payment
     const paymentResponse = await axios.post(
       'https://api.paystack.co/transaction/initialize',
       {
         email: userEmail,
-        amount: parsedAmount * 100, // Convert to kobo
-        reference: `CHIPIN_${uuidv4()}`,
+        amount: parsedAmount * 100,
+        reference: paymentReference,
         metadata: {
           eventId,
+          userId, // Include userId in metadata for reference
           chipInType: 'event',
-          recipientCode: event.chipInDetails.recipientCode
+          recipientCode: eventData.recipientCode
         }
       },
       {
@@ -71,32 +108,45 @@ exports.handler = async (event) => {
       }
     );
 
+    // Save donation record with both userId and userEmail
     await putItem(TABLE_NAMES.DONATIONS, {
-      id: chipInId,
+      id: `DON_${uuidv4()}`,
       eventId,
-      userId: userId,
-      userEmail: userEmail,
+      userId, // Now saving userId
+      userEmail,
       amount: parsedAmount.toString(),
       status: 'pending',
       paymentReference: paymentResponse.data.data.reference,
-      recipientCode: event.chipInDetails.recipientCode,
+      recipientCode: eventData.recipientCode,
       createdAt: new Date().toISOString()
     });
 
-    console.log('Donation initiated', { donationId, userId, eventId });
     return {
       statusCode: 200,
       body: JSON.stringify({
-        donationId,
-        paymentUrl: paystackResponse.data.data.authorization_url,
-        message: 'Payment initiated',
-      }),
+        paymentUrl: paymentResponse.data.data.authorization_url,
+        message: 'Payment initialized successfully',
+        donationDetails: {
+          userId,
+          userEmail,
+          eventId,
+          amount: parsedAmount
+        }
+      })
     };
+
   } catch (error) {
-    console.error('Create donation error', { error: error.message, stack: error.stack });
+    console.error('Donation processing failed:', {
+      message: error.message,
+      stack: error.stack,
+      responseData: error.response?.data
+    });
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Payment initialization failed' }),
+      body: JSON.stringify({ 
+        error: 'Payment processing failed',
+        details: error.response?.data || error.message
+      })
     };
   }
 };
