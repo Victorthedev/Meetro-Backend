@@ -628,6 +628,24 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PaystackWebhookFunction.Arn}/invocations
+  AccountVerifyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: verify-bank
+  AccountVerifyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref AccountVerifyResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountVerifyFunction.Arn}/invocations
   UploadResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -1386,6 +1404,28 @@ Resources:
           SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
           UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
           PAYSTACK_SECRET_KEY: 'sk_test_1c2097d1d4fc512843fc5920562ef4ad8b05eb6b'
+  AccountVerifyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-AccountVerify-${EnvironmentName}
+      Handler: accountVerify.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          PAYSTACK_SECRET_KEY: 'sk_test_1c2097d1d4fc512843fc5920562ef4ad8b05eb6b'
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
   DisburseFundsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1582,6 +1622,13 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/paystack-webhook
+  AccountVerifyLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AccountVerifyFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/verify-bank
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -1606,6 +1653,7 @@ Resources:
       - CreateDonationMethod
       - VerifyDonationMethod
       - PaystackWebhookMethod
+      - AccountVerifyMethod
       - GetUploadUrlMethod
       - ScanQRMethod
       - UpdateProfileMethod

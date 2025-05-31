@@ -1,12 +1,11 @@
 const { getItem, updateItem } = require('../../utils/db');
 const { TABLE_NAMES, NIGERIAN_STATES } = require('../../utils/constants');
-const logger = require('../../utils/logger');
 
 exports.handler = async (event) => {
   try {
     const { eventId, ...updates } = JSON.parse(event.body || '{}');
     if (!eventId || Object.keys(updates).length === 0) {
-      logger.error('Missing eventId or updates', { fields: { eventId, updates } });
+      console.error('Missing eventId or updates', { fields: { eventId, updates } });
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Missing eventId or updates' }),
@@ -16,7 +15,7 @@ exports.handler = async (event) => {
     const userId = event.requestContext.authorizer.jwt.claims.sub;
     const event = await getItem(TABLE_NAMES.EVENTS, { id: { S: eventId } });
     if (!event) {
-      logger.error('Event not found', { eventId });
+      console.error('Event not found', { eventId });
       return {
         statusCode: 404,
         body: JSON.stringify({ error: 'Event not found' }),
@@ -24,7 +23,7 @@ exports.handler = async (event) => {
     }
 
     if (event.creator.S !== userId) {
-      logger.error('Unauthorized update', { userId, eventId });
+      console.error('Unauthorized update', { userId, eventId });
       return {
         statusCode: 403,
         body: JSON.stringify({ error: 'Unauthorized' }),
@@ -33,7 +32,7 @@ exports.handler = async (event) => {
 
     let editCount = event.editCount ? parseInt(event.editCount.N) : 0;
     if (editCount >= 2) {
-      logger.error('Edit limit reached', { eventId, editCount });
+      console.error('Edit limit reached', { eventId, editCount });
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Edit limit of 2 reached' }),
@@ -61,7 +60,7 @@ exports.handler = async (event) => {
     }
     if (updates.location) {
       if (updates.location.state && !NIGERIAN_STATES.includes(updates.location.state)) {
-        logger.error('Invalid Nigerian state', { state: updates.location.state });
+        console.error('Invalid Nigerian state', { state: updates.location.state });
         return {
           statusCode: 400,
           body: JSON.stringify({ error: `Invalid state. Must be one of: ${NIGERIAN_STATES.join(', ')}` }),
@@ -99,7 +98,7 @@ exports.handler = async (event) => {
     }
     if (updates.imageKey) {
       if (!updates.imageKey.startsWith('events/')) {
-        logger.error('Invalid imageKey format', { imageKey: updates.imageKey });
+        console.error('Invalid imageKey format', { imageKey: updates.imageKey });
         return {
           statusCode: 400,
           body: JSON.stringify({ error: 'Invalid imageKey. Must start with "events/"' }),
@@ -124,13 +123,13 @@ exports.handler = async (event) => {
 
     await updateItem(TABLE_NAMES.EVENTS, { id: { S: eventId } }, updateExpression, expressionAttributeValues, expressionAttributeNames);
 
-    logger.info('Event updated', { userId, eventId, editCount: editCount + 1 });
+    console.log('Event updated', { userId, eventId, editCount: editCount + 1 });
     return {
       statusCode: 200,
       body: JSON.stringify({ message: 'Event updated' }),
     };
   } catch (error) {
-    logger.error('Update event error', { error: error.message, stack: error.stack });
+    console.error('Update event error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),

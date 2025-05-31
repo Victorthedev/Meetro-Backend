@@ -3,7 +3,7 @@ const { finalizeEventImage } = require('../../utils/upload');
 const { TABLE_NAMES, EVENT_CATEGORIES } = require('../../utils/constants');
 const { v4: uuidv4 } = require('uuid');
 const { decode } = require('jsonwebtoken');
-const verifyBankDetails = require('../../utils/accountVerification');
+const verifyBankDetails = require('../../services/handlers/accountVerification');
 const axios = require('axios'); 
 
 exports.handler = async (event) => {
@@ -23,7 +23,7 @@ exports.handler = async (event) => {
       imageKey,
       tempImageKey,
       dressCode,
-      bankDetails // Added to the destructured properties
+      bankDetails
     } = body;
 
     let userId;
@@ -117,25 +117,13 @@ exports.handler = async (event) => {
         };
       }
 
-      const bankVerification = await verifyBankDetails(
-        bankDetails.accountNumber,
-        bankDetails.bankCode
-      );
-
-      if (!bankVerification.isValid) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: 'Bank account verification failed: ' + bankVerification.error })
-        };
-      }
-
       const recipientResponse = await axios.post(
         'https://api.paystack.co/transferrecipient',
         {
           type: 'nuban',
-          name: bankVerification.accountName,
-          account_number: bankVerification.accountNumber,
-          bank_code: bankVerification.bankCode,
+          name: bankDetails.accountName,
+          account_number: bankDetails.accountNumber,
+          bank_code: bankDetails.bankCode,
           currency: 'NGN'
         },
         {
