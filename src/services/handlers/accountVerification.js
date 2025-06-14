@@ -8,6 +8,11 @@ exports.handler = async (event) => {
     if (!accountNumber || !bankCode) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Account number and bank code are required' })
       };
     }
@@ -23,6 +28,11 @@ exports.handler = async (event) => {
     
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         isValid: true,
         accountName: response.data.data.account_name,
@@ -34,6 +44,11 @@ exports.handler = async (event) => {
     console.error('Bank verification failed:', error.response?.data || error.message);
     return {
       statusCode: 400,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         isValid: false,
         error: error.response?.data?.message || 'Bank account verification failed'

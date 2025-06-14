@@ -9,6 +9,11 @@ exports.handler = async (event) => {
       logger.error('Missing fileName');
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Missing fileName' }),
       };
     }
@@ -19,12 +24,22 @@ exports.handler = async (event) => {
     logger.info('Upload URL generated', { userId, fileName, key });
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ uploadUrl: url, fileKey: key, message: 'Upload URL generated' }),
     };
   } catch (error) {
     logger.error('Get upload URL error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

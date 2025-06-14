@@ -37,7 +37,11 @@ exports.handler = async (event) => {
       console.error('Missing user ID in event:', JSON.stringify(event, null, 2));
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Invalid user identity' }),
       };
     }
@@ -50,6 +54,11 @@ exports.handler = async (event) => {
       if (!profilePictureKey.startsWith('profiles/')) {
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Invalid profile picture format' }),
         };
       }
@@ -59,6 +68,11 @@ exports.handler = async (event) => {
       if (location.state && !NIGERIAN_STATES.includes(location.state)) {
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Invalid Nigerian state' }),
         };
       }
@@ -75,6 +89,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ message: 'Profile updated successfully' }),
     };
 
@@ -82,6 +101,11 @@ exports.handler = async (event) => {
     console.error('Update error:', error);
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

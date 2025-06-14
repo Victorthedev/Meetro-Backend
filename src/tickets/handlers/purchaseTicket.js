@@ -11,6 +11,11 @@ exports.handler = async (event) => {
       logger.error('Missing required fields', { fields: { ticketId, quantity } });
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Missing required fields' }),
       };
     }
@@ -22,6 +27,11 @@ exports.handler = async (event) => {
       logger.error('Ticket not found or insufficient quantity', { ticketId, quantity });
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Ticket not available' }),
       };
     }
@@ -31,6 +41,11 @@ exports.handler = async (event) => {
       logger.error('User email not found', { userId });
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'User email not found' }),
       };
     }
@@ -67,6 +82,11 @@ exports.handler = async (event) => {
     logger.info('Ticket purchase initiated', { purchaseId, userId, ticketId });
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         purchaseId,
         paymentUrl: paystackResponse.data.data.authorization_url,
@@ -77,6 +97,11 @@ exports.handler = async (event) => {
     logger.error('Purchase ticket error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

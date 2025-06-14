@@ -19,6 +19,11 @@ exports.handler = async (event) => {
       console.error('Profile not found', { userId });
       return {
         statusCode: 404,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Profile not found' }),
       };
     }
@@ -26,6 +31,11 @@ exports.handler = async (event) => {
     console.log('Profile retrieved', { userId });
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         userId: profile.userId.S,
         email: profile.email.S,
@@ -41,6 +51,11 @@ exports.handler = async (event) => {
     console.error('Get profile error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

@@ -11,6 +11,11 @@ exports.handler = async (event) => {
     if (!eventId || !amount || !userEmail) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Missing required fields' })
       };
     }
@@ -22,6 +27,11 @@ exports.handler = async (event) => {
     if (!eventData) {
       return {
         statusCode: 404,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Event not found' })
       };
     }
@@ -30,6 +40,11 @@ exports.handler = async (event) => {
     if (!eventData.chipInAmount || !eventData.recipientCode) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ 
           error: 'Event does not accept chip-ins or is not properly configured',
           details: {
@@ -46,6 +61,11 @@ exports.handler = async (event) => {
       if (parsedAmount !== parseFloat(eventData.chipInSettings.fixedAmount)) {
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ 
             error: `This event requires exactly ₦${eventData.chipInSettings.fixedAmount}` 
           })
@@ -55,6 +75,11 @@ exports.handler = async (event) => {
       if (parsedAmount < parseFloat(eventData.chipInSettings.minAmount)) {
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ 
             error: `Minimum chip-in amount is ₦${eventData.chipInSettings.minAmount}` 
           })
@@ -73,6 +98,11 @@ exports.handler = async (event) => {
     if (!userId) {
       return {
         statusCode: 401,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ 
           error: 'Unauthorized - missing user ID',
           details: {
@@ -123,6 +153,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         paymentUrl: paymentResponse.data.data.authorization_url,
         message: 'Payment initialized successfully',
@@ -143,6 +178,11 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ 
         error: 'Payment processing failed',
         details: error.response?.data || error.message

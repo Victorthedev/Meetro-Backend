@@ -1,6 +1,5 @@
 const { putItem, getItem } = require('../../utils/db');
 const { TABLE_NAMES } = require('../../utils/constants');
-const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { decode } = require('jsonwebtoken');
 // Import DynamoDB dependencies for fallback
@@ -11,27 +10,23 @@ exports.handler = async (event) => {
   try {
     // Parse input with multiple fallbacks
     const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
-    const { eventId, friendEmails, message, shareMethod } = body;
+    const { eventId } = body; // Only need eventId now
     
-    // Validate required fields
-    if (!eventId || !friendEmails || !Array.isArray(friendEmails) || !message || !shareMethod) {
-      console.error('Missing required fields', { fields: { eventId, friendEmails, message, shareMethod } });
+    // Validate required field
+    if (!eventId) {
+      console.error('Missing required field: eventId');
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required fields' }),
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
+        body: JSON.stringify({ error: 'Missing eventId' }),
       };
     }
 
-    // Validate shareMethod
-    if (!['email', 'link'].includes(shareMethod)) {
-      console.error('Invalid share method', { shareMethod });
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid share method. Use "email" or "link".' }),
-      };
-    }
-
-    // Multi-format JWT extraction
+    // Multi-format JWT extraction (unchanged)
     let userId, userName;
     const authContext = event.requestContext?.authorizer;
     
@@ -64,12 +59,15 @@ exports.handler = async (event) => {
       console.error('Missing user ID in event:', JSON.stringify(event, null, 2));
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Invalid user identity' }),
       };
     }
 
-    // Fetch userName from DynamoDB if not in JWT
     if (!userName) {
       try {
         const user = await getItem(TABLE_NAMES.USERS, { userId: { S: userId } });
@@ -81,25 +79,19 @@ exports.handler = async (event) => {
     }
 
     const shareId = uuidv4();
+    const shareUrl = `https://www.meetro.live/event/${eventId}?ref=share_${shareId}`;
     
-    // Generate the event link
-    const eventLink = `https://www.meetro.live/event/${eventId}`;
-
-    // Store share details in DynamoDB with fallback
     try {
       await putItem(TABLE_NAMES.SHARES, {
         id: shareId,
         sharedBy: userId,
         eventId,
-        friendEmails: friendEmails.map(email => ({ S: email })),
-        message,
-        shareMethod,
-        eventLink,
+        shareUrl,
+        attendees: [],
         createdAt: new Date().toISOString(),
       });
     } catch (putError) {
       if (putError.message.includes('PutCommand is not a constructor')) {
-        // Fallback: Use direct DynamoDB client with correct PutCommand
         const client = new DynamoDBClient({ region: process.env.AWS_REGION });
         const docClient = DynamoDBDocumentClient.from(client);
         await docClient.send(new PutCommand({
@@ -108,10 +100,8 @@ exports.handler = async (event) => {
             id: { S: shareId },
             sharedBy: { S: userId },
             eventId: { S: eventId },
-            friendEmails: { L: friendEmails.map(email => ({ S: email })) },
-            message: { S: message },
-            shareMethod: { S: shareMethod },
-            eventLink: { S: eventLink },
+            shareUrl: { S: shareUrl },
+            attendees: { L: [] },
             createdAt: { S: new Date().toISOString() },
           },
         }));
@@ -120,60 +110,37 @@ exports.handler = async (event) => {
       }
     }
 
-    if (shareMethod === 'email') {
-      // Send email via Resend with enhanced error handling
-      try {
-        const emailResponse = await axios.post(
-          'https://api.resend.com/emails',
-          {
-            from: 'Meetro Team <connect@meetro.live>',
-            to: friendEmails,
-            subject: `${userName} is inviting you to this event`,
-            html: `
-              <p>${userName} is inviting you to this event: ${message}</p>
-              <p><a href="${eventLink}">View the event</a></p>
-            `,
-            text: `${userName} is inviting you to this event: ${message}\n\nView the event here: ${eventLink}`,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        console.log('Emails sent successfully via Resend', { shareId, userId, eventId, friendEmails, resendId: emailResponse.data.id });
-      } catch (emailError) {
-        if (emailError.response?.status === 422) {
-          console.error('Resend API error', {
-            status: 422,
-            data: emailError.response?.data,
-            friendEmails,
-          });
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ error: 'Failed to send email: Invalid email parameters' }),
-          };
-        }
-        throw emailError;
-      }
-    } else {
-      // For 'link' shareMethod, simply return the link
-      console.log('Shareable link generated', { shareId, userId, eventId, eventLink });
-    }
-
+    // Get event details to include in response
+    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: { S: eventId } });
+    
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({
         shareId,
+        shareUrl,
         message: 'Event shared successfully',
-        eventLink: shareMethod === 'link' ? eventLink : undefined,
+        eventDetails: {
+          title: eventData?.title?.S,
+          description: eventData?.description?.S,
+          date: eventData?.date?.S,
+          imageUrl: eventData?.imageUrl?.S
+        }
       }),
     };
   } catch (error) {
     console.error('Create share error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

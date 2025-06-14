@@ -19,7 +19,11 @@ const {
       const { idToken } = body;
   
       if (!idToken) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing Google ID token' }) };
+        return { statusCode: 400,       headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  body: JSON.stringify({ error: 'Missing Google ID token' }) };
       }
   
       // Verify Google token
@@ -79,6 +83,11 @@ const {
   
       return {
         statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({
           userId,
           accessToken: authResponse.AuthenticationResult.AccessToken,
@@ -91,6 +100,11 @@ const {
       console.error('Google sign-in error', { error: error.message, stack: error.stack });
       return {
         statusCode: 500,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }

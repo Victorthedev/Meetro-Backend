@@ -8,6 +8,11 @@ exports.handler = async (event) => {
       console.error('Missing eventId or updates', { fields: { eventId, updates } });
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Missing eventId or updates' }),
       };
     }
@@ -18,6 +23,11 @@ exports.handler = async (event) => {
       console.error('Event not found', { eventId });
       return {
         statusCode: 404,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Event not found' }),
       };
     }
@@ -26,6 +36,11 @@ exports.handler = async (event) => {
       console.error('Unauthorized update', { userId, eventId });
       return {
         statusCode: 403,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Unauthorized' }),
       };
     }
@@ -35,6 +50,11 @@ exports.handler = async (event) => {
       console.error('Edit limit reached', { eventId, editCount });
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Edit limit of 2 reached' }),
       };
     }
@@ -63,6 +83,11 @@ exports.handler = async (event) => {
         console.error('Invalid Nigerian state', { state: updates.location.state });
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: `Invalid state. Must be one of: ${NIGERIAN_STATES.join(', ')}` }),
         };
       }
@@ -101,6 +126,11 @@ exports.handler = async (event) => {
         console.error('Invalid imageKey format', { imageKey: updates.imageKey });
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Invalid imageKey. Must start with "events/"' }),
         };
       }
@@ -112,6 +142,11 @@ exports.handler = async (event) => {
     if (updateExpressionParts.length === 0) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'No valid fields to update' }),
       };
     }
@@ -126,12 +161,22 @@ exports.handler = async (event) => {
     console.log('Event updated', { userId, eventId, editCount: editCount + 1 });
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ message: 'Event updated' }),
     };
   } catch (error) {
     console.error('Update event error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }

@@ -16,6 +16,11 @@ exports.handler = async (event) => {
     console.error('Critical Error: PAYSTACK_SECRET_KEY is not set in environment variables');
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Server configuration error' })
     };
   }
@@ -33,6 +38,11 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 400,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Invalid payload format' })
     };
   }
@@ -55,6 +65,11 @@ exports.handler = async (event) => {
       console.error('Unauthorized webhook attempt');
       return { 
         statusCode: 401, 
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Unauthorized webhook' }) 
       };
     }
@@ -65,6 +80,11 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Signature verification failed' })
     };
   }
@@ -72,7 +92,11 @@ exports.handler = async (event) => {
   // 4. Process only successful charges
   if (payload.event !== 'charge.success') {
     console.log('Skipping non-charge event:', payload.event);
-    return { statusCode: 200 };
+    return { statusCode: 200,       headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+    },   };
   }
 
   const transaction = payload.data;
@@ -112,6 +136,11 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 502,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ 
         error: 'Transaction verification failed',
         reference: transaction.reference
@@ -132,6 +161,11 @@ exports.handler = async (event) => {
         });
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Missing required metadata fields' })
         };
       }
@@ -246,7 +280,11 @@ exports.handler = async (event) => {
         throw donationUpdateError;
       }
 
-      return { statusCode: 200 };
+      return { statusCode: 200,       headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },   };
 
     } catch (processingError) {
       console.error('Chip-in processing failed:', {
@@ -256,6 +294,11 @@ exports.handler = async (event) => {
       });
       return {
         statusCode: 500,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({
           error: 'Chip-in processing failed',
           reference: verifiedData.reference
@@ -265,5 +308,9 @@ exports.handler = async (event) => {
   }
 
   console.log('No chip-in processing required for this transaction');
-  return { statusCode: 200 };
+  return { statusCode: 200,       headers: {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+  },   };
 };

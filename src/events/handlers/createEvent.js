@@ -13,6 +13,8 @@ exports.handler = async (event) => {
       title, 
       description, 
       date, 
+      timeFrom, 
+      timeTo,
       location, 
       ticketTypes, 
       isPrivate, 
@@ -23,7 +25,10 @@ exports.handler = async (event) => {
       imageKey,
       tempImageKey,
       dressCode,
-      bankDetails
+      bankDetails,
+      theme = 1,        
+      fontStyle = 1,     
+      isLightMode = true  
     } = body;
 
     let userId;
@@ -50,13 +55,23 @@ exports.handler = async (event) => {
       console.error('Missing user ID in event:', event);
       return {
         statusCode: 401,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Unauthorized' })
       };
     }
 
-    if (!title || !date) {
+    if (!title || !date || !timeFrom) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Title and date are required' })
       };
     }
@@ -64,6 +79,11 @@ exports.handler = async (event) => {
     if (!location?.venue || !location?.state) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Venue address and state are required' })
       };
     }
@@ -71,6 +91,11 @@ exports.handler = async (event) => {
     if (category && !EVENT_CATEGORIES.includes(category)) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: `Invalid category. Valid options: ${EVENT_CATEGORIES.join(', ')}` })
       };
     }
@@ -83,6 +108,11 @@ exports.handler = async (event) => {
     if (finalImageKey && !finalImageKey.startsWith('events/')) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Image key must start with "events/"' })
       };
     }
@@ -91,6 +121,11 @@ exports.handler = async (event) => {
       if (!chipInType || !['FIXED', 'FLEXIBLE'].includes(chipInType)) {
         return { 
           statusCode: 400, 
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Invalid chipInType. Must be FIXED or FLEXIBLE' }) 
         };
       }
@@ -98,21 +133,35 @@ exports.handler = async (event) => {
       if (chipInType === 'FIXED' && !chipInSettings?.fixedAmount) {
         return { 
           statusCode: 400, 
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Fixed amount required for FIXED type' }) 
         };
       }
       
       if (chipInType === 'FLEXIBLE' && !chipInSettings?.minAmount) {
         return { 
-          statusCode: 400, 
+          statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },   
           body: JSON.stringify({ error: 'Min amount required for FLEXIBLE type' }) 
         };
       }
 
-      // NEW: Validate bank details when chip-in is used
       if (!bankDetails || !bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.accountName) {
         return {
           statusCode: 400,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+          },  
           body: JSON.stringify({ error: 'Bank details (bankName, accountNumber, accountName) are required when using chip-in' })
         };
       }
@@ -142,6 +191,8 @@ exports.handler = async (event) => {
         title,
         description: description || '',
         date,
+        timeFrom,
+        ...(timeTo && { timeTo }),  
         location: {
           venue: location.venue,
           city: location.city || '',
@@ -151,6 +202,9 @@ exports.handler = async (event) => {
         ticketTypes: isPrivate ? [] : (ticketTypes || []),
         isPrivate: isPrivate ? 'true' : 'false',
         createdAt: new Date().toISOString(),
+        theme,
+        fontStyle,
+        isLightMode,
         ...(category && { category }),
         ...(finalImageKey && { imageKey: finalImageKey }),
         ...(dressCode && { dressCode }),
@@ -172,6 +226,11 @@ exports.handler = async (event) => {
 
       return {
         statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ 
           eventId,
           ...(finalImageKey && { imageKey: finalImageKey }),
@@ -180,7 +239,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Handle case when chipInAmount is not provided
     const eventId = `${isPrivate ? 'PRI' : 'PUB'}_${uuidv4()}`;
     
     const eventData = {
@@ -189,6 +247,8 @@ exports.handler = async (event) => {
       title,
       description: description || '',
       date,
+      timeFrom,  // Added timeFrom
+      ...(timeTo && { timeTo }),  
       location: {
         venue: location.venue,
         city: location.city || '',
@@ -198,6 +258,9 @@ exports.handler = async (event) => {
       ticketTypes: isPrivate ? [] : (ticketTypes || []),
       isPrivate: isPrivate ? 'true' : 'false',
       createdAt: new Date().toISOString(),
+      theme,
+      fontStyle,
+      isLightMode,
       ...(category && { category }),
       ...(finalImageKey && { imageKey: finalImageKey }),
       ...(dressCode && { dressCode }),
@@ -207,6 +270,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ 
         eventId,
         ...(finalImageKey && { imageKey: finalImageKey }),
@@ -218,6 +286,11 @@ exports.handler = async (event) => {
     console.error('Create event failed', error);
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' })
     };
   }

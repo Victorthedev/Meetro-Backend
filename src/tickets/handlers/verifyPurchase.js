@@ -14,6 +14,11 @@ exports.handler = async (event) => {
       logger.error('Missing reference');
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Missing reference' }),
       };
     }
@@ -28,6 +33,11 @@ exports.handler = async (event) => {
       logger.error('Purchase not found', { reference });
       return {
         statusCode: 404,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ error: 'Purchase not found' }),
       };
     }
@@ -90,6 +100,11 @@ exports.handler = async (event) => {
       logger.info('Purchase verified, QR code generated, and email sent', { reference, purchaseId: purchase.id, emailResponse: emailResponse.data });
       return {
         statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
         body: JSON.stringify({ message: 'Purchase verified', purchase, qrCodeUrl: qrCodeS3Url }),
       };
     }
@@ -97,12 +112,22 @@ exports.handler = async (event) => {
     logger.error('Payment verification failed', { reference });
     return {
       statusCode: 400,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Payment verification failed' }),
     };
   } catch (error) {
     logger.error('Verify purchase error', { error: error.message, stack: error.stack });
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      },  
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
