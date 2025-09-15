@@ -388,6 +388,18 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateStateFunction.Arn}/invocations
+  DeleteEventMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref EventStateResource
+      HttpMethod: PUT
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteEventFunction.Arn}/invocations
   AddToCalendarResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -762,6 +774,7 @@ Resources:
       - GetEventsMethod
       - GetEventMethod
       - UpdateStateMethod
+      - DeleteEventMethod
       - AddToCalendarMethod
       - GetMyEventsMethod
       - GetPublicEventsMethod
@@ -1074,6 +1087,38 @@ Resources:
     Properties:
       FunctionName: !Sub Meetro-UpdateState-${EnvironmentName}
       Handler: updateState.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
+        S3Key: !Sub ${EnvironmentName}/code.zip
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          USERS_TABLE: !Sub MeetroUsers-${EnvironmentName}
+          EVENTS_TABLE: !Sub MeetroEvents-${EnvironmentName}
+          TICKETS_TABLE: !Sub MeetroTickets-${EnvironmentName}
+          PURCHASES_TABLE: !Sub MeetroPurchases-${EnvironmentName}
+          DONATIONS_TABLE: !Sub MeetroDonationsTable-${EnvironmentName}
+          SHARES_TABLE: !Sub MeetroShares-${EnvironmentName}
+          UPLOAD_BUCKET: !Sub meetro-uploads-${AWS::AccountId}-${EnvironmentName}
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_IDENTITY_POOL_ID: !Ref CognitoIdentityPool
+          PAYSTACK_SECRET_KEY: '{{resolve:ssm:/meetro/dev/PaystackSecretKey}}'
+          GOOGLE_CLIENT_ID: '{{resolve:ssm:/meetro/dev/GoogleClientId}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:ssm:/meetro/dev/GoogleClientSecret}}'
+          TWILIO_SID: '{{resolve:ssm:/meetro/dev/TwilioSid}}'
+          TWILIO_AUTH_TOKEN: '{{resolve:ssm:/meetro/dev/TwilioAuthToken}}'
+          TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
+          RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
+          RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
+  UpdateStateFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub Meetro-DeleteEvent-${EnvironmentName}
+      Handler: src/events/handlers/deleteEvent.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: '{{resolve:ssm:/meetro/dev/LambdaCodeBucket}}'
@@ -1686,6 +1731,13 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/PUT/profile
+  DeleteEventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DeleteEventFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/DELETE/events
   GetProfileLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -1735,6 +1787,7 @@ Resources:
       - GetAttendedEventsMethod
       - EmailBlastMethod
       - UpdateStateMethod
+      - DeleteEventMethod
       - AddToCalendarMethod
       - GetMyEventsMethod
       - GetPublicEventsMethod

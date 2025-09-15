@@ -107,7 +107,9 @@ exports.handler = async (event) => {
         title: event.title.S,
         description: event.description?.S,
         date: event.date.S,
-        location: event.location?.S,
+        location: event.location?.M,
+        timeFrom: event.timeFrom?.S, 
+        timeTo: event.timeTo?.S,
         imageUrl: event.imageUrl?.S,
         creator: {
           id: creatorId,

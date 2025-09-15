@@ -75,7 +75,8 @@ exports.handler = async (event) => {
       };
     }
     
-    const share = await getItem(TABLE_NAMES.SHARES, { id: { S: shareId } });
+    // Get share using low-level format key
+    const share = await getItem(TABLE_NAMES.SHARES, { id: shareId });
     
     if (!share) {
       console.error('Share not found', { shareId, userId });
@@ -90,9 +91,9 @@ exports.handler = async (event) => {
       };
     }
     
-    // Fetch user's email from USERS table
-    const user = await getItem(TABLE_NAMES.USERS, { userId: { S: userId } });
-    if (!user || !user.email?.S) {
+    // Fetch user's email from USERS table for email notifications
+    const user = await getItem(TABLE_NAMES.USERS, { userId: userId });
+    if (!user || !user.email) {
       console.error('User or user email not found', { userId });
       return {
         statusCode: 403,
@@ -105,52 +106,9 @@ exports.handler = async (event) => {
       };
     }
     
-    // Check if user's email is in friendEmails (with proper validation)
-    const userEmail = user.email.S.toLowerCase();
-    
-    // Validate friendEmails exists and is properly structured
-    if (!share.friendEmails || !share.friendEmails.L || !Array.isArray(share.friendEmails.L)) {
-      console.error('Invalid share structure: missing or invalid friendEmails', { 
-        shareId, 
-        userId,
-        shareStructure: JSON.stringify(share)
-      });
-      return {
-        statusCode: 403,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },  
-        body: JSON.stringify({ error: 'Invalid share structure' }),
-      };
-    }
-    
-    // Safely map friendEmails to lowercase strings
-    const friendEmails = share.friendEmails.L
-      .filter(email => (email && email.S) || (email && email.M && email.M.S && email.M.S.S))
-      .map(email => email.S ? email.S.toLowerCase() : email.M.S.S.toLowerCase());
-    
-    if (!friendEmails.includes(userEmail)) {
-      console.error('User not authorized for share', {
-        shareId,
-        userId,
-        userEmail,
-        friendEmails
-      });
-      return {
-        statusCode: 403,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },  
-        body: JSON.stringify({ error: 'User email not in share invite list' }),
-      };
-    }
-    
-    // Validate eventId exists
-    if (!share.eventId || !share.eventId.S) {
+    // Validate eventId exists - handle both low-level and document client format
+    const eventId = share.eventId?.S || share.eventId;
+    if (!eventId) {
       console.error('Invalid share structure: missing eventId', { shareId });
       return {
         statusCode: 400,
@@ -164,9 +122,9 @@ exports.handler = async (event) => {
     }
 
     // Get event details for email content
-    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: { S: share.eventId.S } });
+    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
     if (!eventData) {
-      console.error('Event not found', { eventId: share.eventId.S });
+      console.error('Event not found', { eventId });
       return {
         statusCode: 404,
         headers: {
@@ -178,48 +136,69 @@ exports.handler = async (event) => {
       };
     }
 
-    // Check if user already responded
-    const existingAttendees = share.attendees?.L || [];
-    const existingResponseIndex = existingAttendees.findIndex(attendee => 
-      attendee.M?.userId.S === userId || attendee.M?.userId?.S === userId
-    );
+    // Check if user already responded - handle both low-level and document client format
+    const existingAttendees = share.attendees?.L || share.attendees || [];
+    const existingResponseIndex = existingAttendees.findIndex(attendee => {
+      // Handle multiple possible formats
+      const attendeeUserId = attendee.M?.userId?.S || attendee.M?.userId || attendee.userId?.S || attendee.userId;
+      return attendeeUserId === userId;
+    });
+
+    // Check if user has already confirmed "yes"
+    const hasConfirmedYes = existingAttendees.some(attendee => {
+      const attendeeUserId = attendee.M?.userId?.S || attendee.M?.userId || attendee.userId?.S || attendee.userId;
+      const existingResponseType = attendee.M?.responseType?.S || attendee.M?.responseType || attendee.responseType?.S || attendee.responseType;
+      return attendeeUserId === userId && existingResponseType === 'yes';
+    });
+    
+    if (hasConfirmedYes && responseType === 'yes') {
+      return {
+        statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        },  
+        body: JSON.stringify({ error: 'You have already confirmed attendance' }),
+      };
+    }
 
     // Remove previous response if exists (to prevent duplicates)
     if (existingResponseIndex >= 0) {
       await updateItem(
         TABLE_NAMES.SHARES,
-        { id: { S: shareId } },
+        { id: shareId },
         `REMOVE attendees[${existingResponseIndex}]`
       );
     }
 
-    // Add new response
+    // Add new response - maintain consistency with existing data format
     await updateItem(
       TABLE_NAMES.SHARES,
-      { id: { S: shareId } },
+      { id: shareId },
       'SET attendees = list_append(if_not_exists(attendees, :empty), :newAttendee)',
       {
-        ':newAttendee': {
-          L: [{
-            M: {
-              userId: { S: userId },
-              responseType: { S: responseType },
-              respondedAt: { S: new Date().toISOString() }
-            }
-          }]
-        },
-        ':empty': { L: [] }
+        ':newAttendee': [{
+          userId: userId,
+          responseType: responseType,
+          respondedAt: new Date().toISOString()
+        }],
+        ':empty': []
       }
     );
 
     // Handle email notifications based on response type
     try {
-      const eventLink = share.shareUrl?.S || `https://www.meetro.live/event/${share.eventId.S}`;
+      const eventLink = share.shareUrl?.S || share.shareUrl || `https://www.meetro.live/event/${eventId}`;
+      const userEmail = user.email?.S || user.email;
+      const eventTitle = eventData.title?.S || eventData.title || 'the event';
+      const eventLocation = eventData.location?.S || eventData.location || 'Not specified';
+      const eventDate = eventData.date?.S || eventData.date;
       
       if (responseType === 'yes') {
         // For "yes" responses, use calendar handler and send confirmation email
         await calendarHandler.handler({
-          pathParameters: { eventId: share.eventId.S },
+          pathParameters: { eventId: eventId },
           requestContext: {
             authorizer: {
               claims: { sub: userId }
@@ -228,27 +207,30 @@ exports.handler = async (event) => {
           body: JSON.stringify({
             responseType: 'yes',
             previousResponse: existingResponseIndex >= 0 ? 
-              existingAttendees[existingResponseIndex].M?.responseType?.S : null
+              (existingAttendees[existingResponseIndex].M?.responseType?.S || 
+               existingAttendees[existingResponseIndex].M?.responseType ||
+               existingAttendees[existingResponseIndex].responseType?.S ||
+               existingAttendees[existingResponseIndex].responseType) : null
           })
         });
       } else {
         // For "maybe" responses, send specific email
         await axios.post('https://api.resend.com/emails', {
           from: 'Meetro <conneect@meetro.live>',
-          to: user.email.S,
-          subject: `You marked "Maybe" for ${eventData.title?.S || 'the event'}`,
+          to: userEmail,
+          subject: `You marked "Maybe" for ${eventTitle}`,
           html: `
             <h2>You're considering attending</h2>
-            <p>You marked yourself as "Maybe" for <strong>${eventData.title?.S || 'the event'}</strong>.</p>
+            <p>You marked yourself as "Maybe" for <strong>${eventTitle}</strong>.</p>
             <p>You can update your response to "Going" anytime by visiting the event page.</p>
             <p><a href="${eventLink}">View Event Details</a></p>
-            <p>Location: ${eventData.location?.S || 'Not specified'}</p>
-            <p>Date: ${new Date(eventData.date?.S).toLocaleString()}</p>
+            <p>Location: ${eventLocation}</p>
+            <p>Date: ${new Date(eventDate).toLocaleString()}</p>
           `,
-          text: `You marked "Maybe" for ${eventData.title?.S || 'the event'}.\n\n` +
+          text: `You marked "Maybe" for ${eventTitle}.\n\n` +
                 `You can update to "Going" anytime: ${eventLink}\n\n` +
-                `Location: ${eventData.location?.S || 'Not specified'}\n` +
-                `Date: ${new Date(eventData.date?.S).toLocaleString()}`
+                `Location: ${eventLocation}\n` +
+                `Date: ${new Date(eventDate).toLocaleString()}`
         }, {
           headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }
         });
@@ -267,6 +249,12 @@ exports.handler = async (event) => {
       responseType 
     });
     
+    // Extract values for response, handling both formats
+    const eventTitle = eventData.title?.S || eventData.title;
+    const eventDate = eventData.date?.S || eventData.date;
+    const eventLocation = eventData.location?.S || eventData.location;
+    const eventImageUrl = eventData.imageUrl?.S || eventData.imageUrl;
+    
     return {
       statusCode: 200,
       headers: {
@@ -278,10 +266,10 @@ exports.handler = async (event) => {
         message: `Response recorded: ${responseType}`,
         canUpdate: responseType === 'maybe',
         eventDetails: {
-          title: eventData.title?.S,
-          date: eventData.date?.S,
-          location: eventData.location?.S,
-          imageUrl: eventData.imageUrl?.S
+          title: eventTitle,
+          date: eventDate,
+          location: eventLocation,
+          imageUrl: eventImageUrl
         }
       }),
     };

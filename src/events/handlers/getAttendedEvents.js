@@ -36,58 +36,75 @@ exports.handler = async (event) => {
       };
     }
 
-    // 1. Find all shares where this user is an attendee
-    const shares = await queryItems(
-      TABLE_NAMES.SHARES,
-      'contains(attendees, :userId)',
-      {},
-      { ':userId': { S: userId } }
-    );
+    // 1. Find all shares where this user is an attendee with a response
+    const shares = await queryItems(TABLE_NAMES.SHARES, {
+      IndexName: 'byAttendeeUserId-index',
+      KeyConditionExpression: 'attendeeUserId = :userId',
+      FilterExpression: 'attribute_exists(responseType) AND (responseType = :yes OR responseType = :maybe)',
+      ExpressionAttributeValues: {
+        ':userId': userId,
+        ':yes': 'yes',
+        ':maybe': 'maybe'
+      }
+    });
 
-    // 2. Get full event details and response status
+    // 2. Get full event details for each share
     const attendedEvents = await Promise.all(
       shares.map(async (share) => {
-        const event = await getItem(TABLE_NAMES.EVENTS, { id: { S: share.eventId.S } });
-        if (!event) return null;
-
-        // Find the user's specific response
-        const userResponse = share.attendees.L.find(
-          attendee => attendee.M?.userId.S === userId
-        );
-
-        // Get creator details
-        let creator = { firstName: 'Unknown', lastName: '', email: '' };
         try {
-          const creatorData = await getItem(TABLE_NAMES.USERS, { 
-            userId: { S: event.creator.S } 
-          });
-          if (creatorData) {
-            creator = {
-              firstName: creatorData.firstName?.S || 'Unknown',
-              lastName: creatorData.lastName?.S || '',
-              email: creatorData.email?.S || ''
-            };
-          }
-        } catch (error) {
-          console.error('Error fetching creator data:', error);
-        }
+          const eventId = share.eventId?.S || share.eventId;
+          const event = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
+          if (!event) return null;
 
-        return {
-          id: event.id.S,
-          title: event.title.S,
-          description: event.description?.S,
-          date: event.date.S,
-          location: event.location?.S,
-          imageUrl: event.imageUrl?.S,
-          creator: {
-            id: event.creator.S,
-            name: `${creator.firstName} ${creator.lastName}`.trim(),
-            email: creator.email
-          },
-          response: userResponse?.M?.responseType.S || 'unknown',
-          respondedAt: userResponse?.M?.respondedAt.S,
-          shareId: share.id.S
-        };
+          // Get creator details
+          let creator = { firstName: 'Unknown', lastName: '', email: '' };
+          try {
+            const creatorId = event.creator?.S || event.creator;
+            if (creatorId) {
+              const creatorData = await getItem(TABLE_NAMES.USERS, { 
+                userId: creatorId 
+              });
+              if (creatorData) {
+                creator = {
+                  firstName: creatorData.firstName?.S || 'Unknown',
+                  lastName: creatorData.lastName?.S || '',
+                  email: creatorData.email?.S || ''
+                };
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching creator data:', error);
+          }
+
+          // Extract response details from the share record
+          const responseType = share.responseType?.S || share.responseType;
+          const respondedAt = share.respondedAt?.S || share.respondedAt;
+          const shareId = share.id?.S || share.id;
+
+          return {
+            id: event.id?.S || event.id,
+            title: event.title?.S || event.title,
+            description: event.description?.S || event.description,
+            date: event.date?.S || event.date,
+            location: event.location?.M || event.location, 
+            timeFrom: event.timeFrom?.S || event.timeFrom, 
+            timeTo: event.timeTo?.S || event.timeTo,     
+            imageUrl: event.imageUrl?.S || event.imageUrl,
+            creator: {
+              id: event.creator?.S || event.creator,
+              name: `${creator.firstName} ${creator.lastName}`.trim(),
+              email: creator.email
+            },
+            response: responseType,
+            respondedAt: respondedAt,
+            shareId: shareId,
+            chipInAmount: share.chipInAmount?.N || share.chipInAmount || "0",
+            paymentStatus: share.paymentStatus?.S || share.paymentStatus || "pending"
+          };
+        } catch (error) {
+          console.error('Error processing share:', error);
+          return null;
+        }
       })
     );
 

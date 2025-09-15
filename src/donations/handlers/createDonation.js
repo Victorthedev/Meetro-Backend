@@ -117,6 +117,8 @@ exports.handler = async (event) => {
       };
     }
 
+    const fee = Math.ceil(amount * 0.05) + 100; // 5% + ₦100
+    const totalAmount = amount + fee;
     const paymentReference = `CHIPIN_${uuidv4()}`;
 
     // Initialize payment
@@ -124,11 +126,13 @@ exports.handler = async (event) => {
       'https://api.paystack.co/transaction/initialize',
       {
         email: userEmail,
-        amount: parsedAmount * 100,
+        amount: totalAmount * 100,
         reference: paymentReference,
         metadata: {
           eventId,
           userId, // Include userId in metadata for reference
+          originalAmount: amount, // Store original amount
+          feeAmount: fee, // Store fee amount
           chipInType: 'event',
           recipientCode: eventData.recipientCode
         }
@@ -144,7 +148,9 @@ exports.handler = async (event) => {
       eventId,
       userId, // Now saving userId
       userEmail,
-      amount: parsedAmount.toString(),
+      amount: amount.toString(), // Original amount
+      fee: fee.toString(), // Fee amount
+      totalAmount: totalAmount.toString(), // Total charged
       status: 'pending',
       paymentReference: paymentResponse.data.data.reference,
       recipientCode: eventData.recipientCode,
@@ -165,7 +171,7 @@ exports.handler = async (event) => {
           userId,
           userEmail,
           eventId,
-          amount: parsedAmount
+          amount: totalAmount
         }
       })
     };

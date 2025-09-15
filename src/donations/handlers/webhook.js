@@ -92,11 +92,14 @@ exports.handler = async (event) => {
   // 4. Process only successful charges
   if (payload.event !== 'charge.success') {
     console.log('Skipping non-charge event:', payload.event);
-    return { statusCode: 200,       headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-    },   };
+    return { 
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+      }
+    };
   }
 
   const transaction = payload.data;
@@ -148,12 +151,13 @@ exports.handler = async (event) => {
     };
   }
 
-  // 6. Process chip-in payments
+  // 6. Process chip-in payments with fee splitting
   if (verifiedData.metadata?.chipInType === 'event') {
     try {
-      const { eventId, recipientCode, userId } = verifiedData.metadata;
-      const amount = verifiedData.amount / 100;
-
+      const { eventId, recipientCode, userId, originalAmount, feeAmount } = verifiedData.metadata;
+      const amount = originalAmount; // Amount to send to creator
+      const fee = feeAmount; // Amount to keep as platform fee
+      
       if (!eventId || !recipientCode) {
         console.error('Missing required metadata:', {
           eventIdPresent: !!eventId,
@@ -170,23 +174,25 @@ exports.handler = async (event) => {
         };
       }
 
-      console.log('Processing chip-in donation:', {
+      console.log('Processing chip-in donation with fee splitting:', {
         eventId,
         amount,
+        fee,
         userId,
         recipientCode
       });
 
-      // 7. Update donation record
+      // 7. Update donation record as completed
       try {
         const updateResult = await updateItem(
           TABLE_NAMES.DONATIONS,
           { paymentReference: verifiedData.reference },
-          'SET status = :status, verifiedAt = :now, amount = :amount',
+          'SET status = :status, verifiedAt = :now, amount = :amount, fee = :fee',
           {
             ':status': 'completed',
             ':now': new Date().toISOString(),
-            ':amount': amount.toString()
+            ':amount': amount.toString(),
+            ':fee': fee.toString()
           }
         );
         console.log('Donation update successful:', updateResult);
@@ -199,15 +205,55 @@ exports.handler = async (event) => {
         throw updateError;
       }
 
-      // 8. Initiate transfer
-      let transferResponse;
+      // 8. Get platform recipient code
+      const platformRecipientCode = process.env.PLATFORM_RECIPIENT_CODE;
+      if (!platformRecipientCode) {
+        throw new Error('Platform recipient code not configured');
+      }
+
+      // 9. Initiate transfer to platform (for fees)
+      let platformTransferResponse;
       try {
-        console.log('Initiating transfer...');
-        transferResponse = await axios.post(
+        console.log('Initiating platform fee transfer...');
+        platformTransferResponse = await axios.post(
           'https://api.paystack.co/transfer',
           {
             source: 'balance',
-            amount: Math.floor(amount * 100),
+            amount: Math.floor(fee * 100), // in kobo
+            recipient: platformRecipientCode,
+            reason: `Platform fee for event ${eventId}`,
+            reference: `XFER_FEE_${verifiedData.reference}`
+          },
+          {
+            headers: { 
+              Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000
+          }
+        );
+        console.log('Platform fee transfer initiated successfully:', {
+          transferReference: platformTransferResponse.data.data.reference,
+          status: platformTransferResponse.data.data.status
+        });
+      } catch (platformTransferError) {
+        console.error('Platform fee transfer initiation failed:', {
+          error: platformTransferError.message,
+          stack: platformTransferError.stack,
+          response: platformTransferError.response?.data
+        });
+        throw platformTransferError;
+      }
+
+      // 10. Initiate transfer to creator
+      let creatorTransferResponse;
+      try {
+        console.log('Initiating creator transfer...');
+        creatorTransferResponse = await axios.post(
+          'https://api.paystack.co/transfer',
+          {
+            source: 'balance',
+            amount: Math.floor(amount * 100), // in kobo
             recipient: recipientCode,
             reason: `Chip-in for event ${eventId}`,
             reference: `XFER_${verifiedData.reference}`
@@ -220,20 +266,42 @@ exports.handler = async (event) => {
             timeout: 30000
           }
         );
-        console.log('Transfer initiated successfully:', {
-          transferReference: transferResponse.data.data.reference,
-          status: transferResponse.data.data.status
+        console.log('Creator transfer initiated successfully:', {
+          transferReference: creatorTransferResponse.data.data.reference,
+          status: creatorTransferResponse.data.data.status
         });
-      } catch (transferError) {
-        console.error('Transfer initiation failed:', {
-          error: transferError.message,
-          stack: transferError.stack,
-          response: transferError.response?.data
+      } catch (creatorTransferError) {
+        console.error('Creator transfer initiation failed:', {
+          error: creatorTransferError.message,
+          stack: creatorTransferError.stack,
+          response: creatorTransferError.response?.data
         });
-        throw transferError;
+        throw creatorTransferError;
       }
 
-      // 9. Update event with transfer details
+      // 11. Update donation with transfer references
+      try {
+        const donationUpdate = await updateItem(
+          TABLE_NAMES.DONATIONS, 
+          { paymentReference: verifiedData.reference },
+          'SET transferReference = :ref, platformTransferReference = :platformRef, transferredAt = :now',
+          {
+            ':ref': creatorTransferResponse.data.data.reference,
+            ':platformRef': platformTransferResponse.data.data.reference,
+            ':now': new Date().toISOString()
+          }
+        );
+        console.log('Donation transfer references update successful:', donationUpdate);
+      } catch (donationUpdateError) {
+        console.error('Donation transfer references update failed:', {
+          error: donationUpdateError.message,
+          stack: donationUpdateError.stack,
+          reference: verifiedData.reference
+        });
+        throw donationUpdateError;
+      }
+
+      // 12. Update event with chipInTotal (original amount only)
       try {
         const eventUpdate = await updateItem(
           TABLE_NAMES.EVENTS,
@@ -243,7 +311,7 @@ exports.handler = async (event) => {
             ':amount': amount,
             ':chipIn': {
               amount,
-              transferReference: transferResponse.data.data.reference,
+              transferReference: creatorTransferResponse.data.data.reference,
               transferredAt: new Date().toISOString(),
               userId
             }
@@ -259,39 +327,25 @@ exports.handler = async (event) => {
         throw eventUpdateError;
       }
 
-      // 10. Update donation with transfer reference
-      try {
-        const donationUpdate = await updateItem(
-          TABLE_NAMES.DONATIONS, 
-          { paymentReference: verifiedData.reference },
-          'SET transferReference = :ref, transferredAt = :now',
-          {
-            ':ref': transferResponse.data.data.reference,
-            ':now': new Date().toISOString()
-          }
-        );
-        console.log('Donation transfer reference update successful:', donationUpdate);
-      } catch (donationUpdateError) {
-        console.error('Donation transfer reference update failed:', {
-          error: donationUpdateError.message,
-          stack: donationUpdateError.stack,
-          reference: verifiedData.reference
-        });
-        throw donationUpdateError;
-      }
-
-      return { statusCode: 200,       headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-      },   };
+      return { 
+        statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+        }
+      };
 
     } catch (processingError) {
-      console.error('Chip-in processing failed:', {
+      console.error('Chip-in processing with fee splitting failed:', {
         error: processingError.message,
         stack: processingError.stack,
         transaction: verifiedData
       });
+      
+      // Implement retry logic or manual review process here
+      //I might want to log this to a separate table for failed transactions
+      
       return {
         statusCode: 500,
         headers: {
@@ -300,17 +354,21 @@ exports.handler = async (event) => {
           "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
         },  
         body: JSON.stringify({
-          error: 'Chip-in processing failed',
-          reference: verifiedData.reference
+          error: 'Chip-in processing with fee splitting failed',
+          reference: verifiedData.reference,
+          details: processingError.message
         })
       };
     }
   }
 
   console.log('No chip-in processing required for this transaction');
-  return { statusCode: 200,       headers: {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-  },   };
+  return { 
+    statusCode: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
+    }
+  };
 };

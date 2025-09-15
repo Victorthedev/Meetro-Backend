@@ -2,7 +2,7 @@ const { getItem } = require('../../utils/db');
 const { TABLE_NAMES, API_KEYS } = require('../../utils/constants');
 const { google } = require('googleapis');
 const axios = require('axios');
-const icalGenerator = require('ical-generator');
+const ical = require('ical-generator').default; // Correct import for ES modules
 const { decode } = require('jsonwebtoken');
 
 const oauth2Client = new google.auth.OAuth2(
@@ -13,14 +13,13 @@ const oauth2Client = new google.auth.OAuth2(
 
 exports.handler = async (event) => {
   try {
-    // Parse input with multiple fallbacks
+    // Parse input
     const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
     const { eventId } = event.pathParameters || {};
     const { responseType, previousResponse } = body;
 
     // Validate required fields
     if (!eventId) {
-      console.error('Missing eventId');
       return {
         statusCode: 400,
         headers: {
@@ -32,33 +31,23 @@ exports.handler = async (event) => {
       };
     }
 
-    // Multi-format JWT extraction
+    // Extract user ID from auth context
     let userId;
     const authContext = event.requestContext?.authorizer;
-
-    // Case 1: Standard API Gateway with Cognito
+    
     if (authContext?.jwt?.claims?.sub) {
       userId = authContext.jwt.claims.sub;
     }
-    // Case 2: Proxy integration format
     else if (authContext?.claims?.sub) {
       userId = authContext.claims.sub;
     }
-    // Case 3: Fallback to Authorization header
     else if (event.headers?.Authorization) {
       const token = event.headers.Authorization.split(' ')[1];
       const decoded = decode(token);
       userId = decoded?.sub;
     }
 
-    // Handle JWT-as-ID case
-    if (userId && userId.startsWith('eyJ')) {
-      const decoded = decode(userId);
-      userId = decoded?.sub;
-    }
-
     if (!userId) {
-      console.error('Missing user ID in event:', JSON.stringify(event, null, 2));
       return {
         statusCode: 401,
         headers: {
@@ -66,158 +55,150 @@ exports.handler = async (event) => {
           "Access-Control-Allow-Headers": "Content-Type,Authorization",
           "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
         },  
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ error: 'Invalid user identity' }),
       };
     }
 
-    const user = await getItem(TABLE_NAMES.USERS, { userId: { S: userId } });
-
-    if (!user) {
-      console.error('User not found', { userId });
+    // Get user and event data
+    const user = await getItem(TABLE_NAMES.USERS, { userId });
+    if (!user || !user.email) {
       return {
         statusCode: 404,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },  
-        body: JSON.stringify({ error: 'User not found' }),
+        body: JSON.stringify({ error: 'User not found or missing email' }),
       };
     }
 
-    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: { S: eventId } });
-    if (!eventData) {
-      console.error('Event not found', { eventId });
+    const eventData = await getItem(TABLE_NAMES.EVENTS, { id: eventId });
+    if (!eventData || !eventData.title || !eventData.date) {
       return {
         statusCode: 404,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },  
-        body: JSON.stringify({ error: 'Event not found' }),
+        body: JSON.stringify({ error: 'Event not found or missing required fields' }),
       };
     }
 
-    // Determine email subject and content based on response type
+    // Prepare email content
     const isUpdateFromMaybe = previousResponse === 'maybe' && responseType === 'yes';
     const subject = isUpdateFromMaybe 
-      ? `You updated to "Going" for ${eventData.title.S}`
+      ? `You updated to "Going" for ${eventData.title}`
       : responseType === 'yes' 
-        ? `You're confirmed for ${eventData.title.S}`
-        : `You marked "Maybe" for ${eventData.title.S}`;
+        ? `You're confirmed for ${eventData.title}`
+        : `You marked "Maybe" for ${eventData.title}`;
 
     const htmlContent = isUpdateFromMaybe
-      ? `<p>You've updated your response from "Maybe" to "Going" for ${eventData.title.S}!</p>`
+      ? `<p>You've updated your response from "Maybe" to "Going" for ${eventData.title}!</p>`
       : responseType === 'yes'
-        ? `<p>You're confirmed for ${eventData.title.S}!</p>`
-        : `<p>You marked yourself as "Maybe" for ${eventData.title.S}.</p>`;
+        ? `<p>You're confirmed for ${eventData.title}!</p>`
+        : `<p>You marked yourself as "Maybe" for ${eventData.title}.</p>`;
 
+    // Create calendar event object
+    const eventStart = new Date(eventData.date);
+    const eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000); // 2 hours duration
+    
+    // Generate ICS file
+    const calendar = ical({
+      name: 'Meetro Event',
+      timezone: 'UTC'
+    });
+    
+    calendar.createEvent({
+      start: eventStart,
+      end: eventEnd,
+      summary: eventData.title,
+      description: `${eventData.description || ''}\n\nEvent Link: https://meetro.live/event/${eventId}`,
+      url: `https://meetro.live/event/${eventId}`,
+      organizer: {
+        name: 'Meetro',
+        email: 'connect@meetro.live'
+      }
+    });
+
+    const icsContent = calendar.toString();
+
+    // Add to Google Calendar if connected
     if (user.googleCalendarTokens) {
-      // Google Calendar is linked
-      oauth2Client.setCredentials(JSON.parse(user.googleCalendarTokens.S));
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      try {
+        oauth2Client.setCredentials(JSON.parse(user.googleCalendarTokens));
+        const calendarAPI = google.calendar({ version: 'v3', auth: oauth2Client });
+        
+        await calendarAPI.events.insert({
+          calendarId: 'primary',
+          requestBody: {
+            summary: eventData.title,
+            description: eventData.description || '',
+            start: { dateTime: eventStart.toISOString() },
+            end: { dateTime: eventEnd.toISOString() },
+            location: eventData.location || ''
+          },
+        });
+        console.log('Event added to Google Calendar');
+      } catch (googleError) {
+        console.error('Google Calendar error:', googleError);
+        // Continue with email fallback
+      }
+    }
 
-      await calendar.events.insert({
-        calendarId: 'primary',
-        requestBody: {
-          summary: eventData.title.S,
-          description: eventData.description.S,
-          start: { dateTime: eventData.date.S },
-          end: { dateTime: new Date(new Date(eventData.date.S).getTime() + 2 * 60 * 60 * 1000).toISOString() },
-        },
-      });
-      console.log('Event added to Google Calendar', { userId, eventId });
-
-      // Send confirmation email for Google Calendar users
-      await axios.post(
+    // Send confirmation email
+    try {
+      const emailResponse = await axios.post(
         'https://api.resend.com/emails',
         {
-          from: API_KEYS.RESEND_FROM_EMAIL,
-          to: user.email.S,
+          from: 'Meetro <connect@meetro.live>',
+          to: user.email,
           subject: subject,
           html: `
+            <h2>${subject}</h2>
             ${htmlContent}
-            <p>Event: ${eventData.title.S}</p>
-            <p>Date: ${new Date(eventData.date.S).toLocaleString()}</p>
-            <p>Location: ${eventData.location?.S || 'Not specified'}</p>
-            <p>The event has been added to your Google Calendar.</p>
-          `
-        },
-        {
-          headers: { Authorization: `Bearer ${API_KEYS.RESEND_API_KEY}` },
-        }
-      );
-    } else {
-      // Google Calendar not linked, send ICS file via email
-      const calendar = icalGenerator({
-        name: 'Meetro Event',
-        timezone: 'UTC'
-      });
-      
-      calendar.createEvent({
-        start: new Date(eventData.date.S),
-        end: new Date(new Date(eventData.date.S).getTime() + 2 * 60 * 60 * 1000),
-        summary: eventData.title.S,
-        description: eventData.description.S + `\n\nEvent Link: https://meetro.live/event/${eventId}`,
-        url: `https://meetro.live/event/${eventId}`,
-        organizer: {
-          name: 'Meetro',
-          email: 'noreply@meetro.live'
-        },
-        method: 'REQUEST'
-      });
-
-      const icsContent = calendar.toString();
-      
-      await axios.post(
-        'https://api.resend.com/emails',
-        {
-          from: API_KEYS.RESEND_FROM_EMAIL,
-          to: user.email.S,
-          subject: subject,
-          html: `
-            ${htmlContent}
-            <p>Please find the event invitation attached.</p>
-            <p>Event: ${eventData.title.S}</p>
-            <p>Date: ${new Date(eventData.date.S).toLocaleString()}</p>
-            <p>Location: ${eventData.location?.S || 'Not specified'}</p>
+            <p><strong>Event Details:</strong></p>
+            <p>Title: ${eventData.title}</p>
+            <p>Date: ${eventStart.toLocaleString()}</p>
+            <p>Location: ${eventData.location || 'Not specified'}</p>
+            ${user.googleCalendarTokens ? '<p>The event has been added to your Google Calendar.</p>' : ''}
+            <p>You can manage your RSVP at: https://meetro.live/event/${eventId}</p>
           `,
           attachments: [{
             filename: 'event.ics',
             content: Buffer.from(icsContent).toString('base64'),
-            contentType: 'text/calendar; method=REQUEST; charset=UTF-8'
+            contentType: 'text/calendar; method=REQUEST'
           }]
         },
-        { headers: { Authorization: `Bearer ${API_KEYS.RESEND_API_KEY}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${process.env.RESEND_API_KEY || API_KEYS.RESEND_API_KEY}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
-      console.log('ICS file sent to email', { userId, eventId, email: user.email.S });
+      console.log('Email sent successfully');
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError.response?.data || emailError.message);
+      // Continue execution even if email fails
     }
 
-    console.log('Event added to calendar or emailed', { userId, eventId, responseType });
     return {
       statusCode: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-      },  
+      },
       body: JSON.stringify({ 
-        message: 'Event added to calendar or emailed',
-        responseType: responseType || 'yes' // Default to 'yes' for backward compatibility
+        message: 'Calendar event processed and confirmation sent',
+        responseType: responseType || 'yes'
       }),
     };
   } catch (error) {
-    console.error('Add to calendar error', { error: error.message, stack: error.stack });
+    console.error('Handler error:', error);
     return {
       statusCode: 500,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-      },  
-      body: JSON.stringify({ error: 'Internal server error' }),
+      },
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }),
     };
   }
 };
