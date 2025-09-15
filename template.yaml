@@ -392,8 +392,8 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref EventStateResource
-      HttpMethod: PUT
+      ResourceId: !Ref EventIdResource
+      HttpMethod: DELETE
       AuthorizationType: COGNITO_USER_POOLS
       AuthorizerId: !Ref CognitoAuthorizer
       Integration:
@@ -1114,7 +1114,7 @@ Resources:
           TWILIO_PHONE_NUMBER: '{{resolve:ssm:/meetro/dev/TwilioPhoneNumber}}'
           RESEND_API_KEY: '{{resolve:ssm:/meetro/dev/ResendApiKey}}'
           RESEND_FROM_EMAIL: '{{resolve:ssm:/meetro/dev/ResendFromEmail}}'
-  UpdateStateFunction:
+  DeleteEventFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub Meetro-DeleteEvent-${EnvironmentName}
